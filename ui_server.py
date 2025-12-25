@@ -87,9 +87,9 @@ def load_config():
         "port": 8080,
         "global_vars": {
             "DEFAULT_SYS": "You are an expert AI Data Scientist. Your goal is to minimize Mean Squared Error (MSE) on the Diabetes dataset. Modify `strategy.py` to improve the `Strategy` class (sklearn model). Metric: MSE (Lower is better).",
-        "venv": "python" # Changed from sys.executable to 'python' for a more generic default
-    },
-    "llm_changeable_vars": [
+        "venv": "python"
+        },
+        "llm_changeable_vars": ["hypothesis", "exp_design", "result_analysis", "hint"]
     }
     try:
         with open(CONFIG_FILE, 'w') as f:
