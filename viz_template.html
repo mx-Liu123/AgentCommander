@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Progress Visualizer</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --sidebar-width: 420px;
+            --border-color: #e2e8f0;
+            --line-color: #cbd5e0;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            
+            --improved-bg: #f0fff4;
+            --improved-border: #48bb78;
+            --failed-bg: #fff5f5;
+            --failed-border: #f56565;
+            --working-bg: #ebf8ff;
+            --working-border: #4299e1;
+        }
+
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: var(--sidebar-width);
+            background: white;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: #fff;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1a202c;
+        }
+        
+        .refresh-badge {
+            font-size: 0.7rem;
+            color: #718096;
+            background: #edf2f7;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        #tree-root {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 10px 20px 20px; /* Left padding for root lines */
+        }
+
+        /* Tree Structure CSS */
+        .branch-node {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        /* Branch Title (The Folder) */
+        .branch-title {
+            font-weight: 600;
+            color: #2d3748;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            border-radius: 6px;
+            transition: background 0.15s;
+            user-select: none;
+        }
+
+        .branch-title:hover {
+            background: #edf2f7;
+        }
+
+        .branch-icon {
+            margin-right: 8px;
+            font-size: 1.1rem;
+            transition: transform 0.2s;
+        }
+
+        .branch-node.collapsed .branch-icon {
+            transform: rotate(-90deg);
+        }
+
+        .branch-node.collapsed .exp-list {
+            display: none;
+        }
+
+        /* Experiment List (The Children) */
+        .exp-list {
+            position: relative;
+            padding-left: 24px; /* Indentation */
+            margin-left: 8px;
+            border-left: 2px solid var(--line-color); /* Vertical tree line */
+        }
+
+        /* Experiment Item (The File/Node) */
+        .exp-item-container {
+            position: relative;
+            margin-bottom: 12px;
+        }
+
+        /* Horizontal Connector Line */
+        .exp-item-container::before {
+            content: '';
+            position: absolute;
+            top: 18px; /* Align with card center/top */
+            left: -26px; /* Connect to vertical line */
+            width: 24px;
+            height: 2px;
+            background-color: var(--line-color);
+        }
+
+        /* Last item vertical line fix (optional, keeps line going but simplified for now) */
+        
+        .exp-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .exp-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        /* Status Colors */
+        .status-improved { background: var(--improved-bg); border-color: var(--improved-border); }
+        .status-no-improved { background: var(--failed-bg); border-color: var(--failed-border); }
+        .status-working { background: var(--working-bg); border-color: var(--working-border); }
+        
+        /* Make border simpler: left strip */
+        .exp-card.status-improved { border-left-width: 5px; }
+        .exp-card.status-no-improved { border-left-width: 5px; }
+        .exp-card.status-working { border-left-width: 5px; }
+
+        .exp-header {
+            padding: 10px 12px;
+        }
+
+        .exp-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        
+        .exp-badge {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .status-improved .exp-badge { color: #22543d; background: #c6f6d5; }
+        .status-no-improved .exp-badge { color: #742a2a; background: #fed7d7; }
+        .status-working .exp-badge { color: #2c5282; background: #bee3f8; }
+
+        .exp-goal {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .exp-metric {
+            margin-top: 6px;
+            font-family: "Menlo", monospace;
+            font-size: 0.75rem;
+            color: #4a5568;
+            background: rgba(255,255,255,0.6);
+            padding: 2px 4px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        /* File List */
+        .file-list {
+            display: none;
+            background: rgba(255,255,255,0.8);
+            border-top: 1px solid rgba(0,0,0,0.05);
+        }
+        .file-list.active { display: block; }
+
+        .file-item {
+            padding: 6px 12px 6px 16px;
+            font-size: 0.8rem;
+            color: #4a5568;
+            border-bottom: 1px solid #f7fafc;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .file-item:last-child { border-bottom: none; }
+        .file-item:hover { background: rgba(0,0,0,0.03); color: #1a202c; }
+        .file-icon { margin-right: 8px; opacity: 0.5; }
+
+        /* Main Viewer */
+        #main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: white;
+        }
+
+        .content-header {
+            height: 50px;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            background: #fcfcfc;
+            color: #718096;
+            font-size: 0.9rem;
+            font-family: monospace;
+        }
+
+        #file-viewer {
+            flex: 1;
+            overflow: auto;
+            padding: 0;
+        }
+
+        pre {
+            margin: 0;
+            padding: 20px;
+            font-family: "Menlo", "Monaco", "Consolas", monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #cbd5e0;
+        }
+        .empty-icon { font-size: 3rem; margin-bottom: 10px; opacity: 0.5; }
+
+        /* Syntax Highlighting */
+        .json-key { color: #e53e3e; }
+        .json-string { color: #38a169; }
+        .json-number { color: #3182ce; }
+        .json-boolean { color: #805ad5; }
+        .json-null { color: #718096; }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h2>🌳 Experiment Tree</h2>
+        <span class="refresh-badge">Live: 10s</span>
+    </div>
+    <div id="tree-root"></div>
+</div>
+
+<div id="main-content">
+    <div class="content-header">
+        <span id="current-file-path">Select a file to preview</span>
+    </div>
+    <div id="file-viewer">
+        <div class="empty-state">
+            <div class="empty-icon">📄</div>
+            <div>Select a file from the tree</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_ROOT = '/api';
+    
+    // State persistence
+    // We store IDs of things that are in "non-default" state.
+    // Branch: Default Open. Store Closed ones.
+    // Exp: Default Closed. Store Open ones.
+    let collapsedBranches = new Set();
+    let expandedExperiments = new Set(); 
+
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchTree();
+        setInterval(fetchTree, 10000);
+    });
+
+    async function fetchTree() {
+        try {
+            const response = await fetch(`${API_ROOT}/tree`);
+            const data = await response.json();
+            renderTree(data.branches);
+        } catch (error) {
+            console.error('Error fetching tree:', error);
+        }
+    }
+
+    function renderTree(branches) {
+        const container = document.getElementById('tree-root');
+        container.innerHTML = '';
+
+        branches.forEach(branch => {
+            const branchDiv = document.createElement('div');
+            branchDiv.className = 'branch-node';
+            
+            // Restore collapsed state
+            if (collapsedBranches.has(branch.name)) {
+                branchDiv.classList.add('collapsed');
+            }
+
+            // Branch Title
+            const title = document.createElement('div');
+            title.className = 'branch-title';
+            title.innerHTML = `<span class="branch-icon">📂</span> ${branch.name}`;
+            
+            title.onclick = () => {
+                branchDiv.classList.toggle('collapsed');
+                if (branchDiv.classList.contains('collapsed')) {
+                    collapsedBranches.add(branch.name);
+                } else {
+                    collapsedBranches.delete(branch.name);
+                }
+            };
+            
+            branchDiv.appendChild(title);
+
+            // Experiment List Container
+            const expList = document.createElement('div');
+            expList.className = 'exp-list';
+
+            branch.experiments.forEach(exp => {
+                const itemContainer = document.createElement('div');
+                itemContainer.className = 'exp-item-container';
+
+                // Card Status
+                let statusClass = 'status-working';
+                let badgeText = 'Working';
+                if (exp.status.includes('no improved')) { 
+                    statusClass = 'status-no-improved'; 
+                    badgeText = 'No Imprv';
+                } else if (exp.status.includes('improved')) { 
+                    statusClass = 'status-improved'; 
+                    badgeText = 'Improved';
+                }
+
+                const expCard = document.createElement('div');
+                expCard.className = `exp-card ${statusClass}`;
+                
+                // Card Header
+                const header = document.createElement('div');
+                header.className = 'exp-header';
+                header.innerHTML = `
+                    <div class="exp-name">
+                        <span>${exp.name}</span>
+                        <span class="exp-badge">${badgeText}</span>
+                    </div>
+                    <div class="exp-goal">${exp.goal || 'No goal'}</div>
+                    ${exp.metric ? `<div class="exp-metric">Metric: ${exp.metric}</div>` : ''}
+                `;
+
+                // File List Container
+                const fileList = document.createElement('div');
+                fileList.className = 'file-list';
+                
+                // Restore expanded state
+                if (expandedExperiments.has(exp.path)) {
+                    fileList.classList.add('active');
+                    // If active, we must ensure files are loaded
+                    loadFileList(exp.path, fileList);
+                }
+
+                header.onclick = (e) => {
+                    if (fileList.classList.contains('active')) {
+                        fileList.classList.remove('active');
+                        expandedExperiments.delete(exp.path);
+                    } else {
+                        fileList.classList.add('active');
+                        expandedExperiments.add(exp.path);
+                        loadFileList(exp.path, fileList);
+                    }
+                };
+
+                expCard.appendChild(header);
+                expCard.appendChild(fileList);
+                itemContainer.appendChild(expCard);
+                expList.appendChild(itemContainer);
+            });
+
+            branchDiv.appendChild(expList);
+            container.appendChild(branchDiv);
+        });
+    }
+
+    async function loadFileList(expPath, container) {
+        // Simple lazy load: if we already have children (and not loading msg), skip
+        // But since we refresh tree every 10s, container is recreated empty!
+        // So this function is ALWAYS called for expanded nodes on refresh.
+        // This ensures file list updates if new files appear. Good.
+        
+        container.innerHTML = '<div style="padding:10px;color:#999;font-size:0.8rem;">Loading files...</div>';
+        
+        try {
+            const res = await fetch(`${API_ROOT}/list_files?path=${encodeURIComponent(expPath)}`);
+            const data = await res.json();
+            
+            container.innerHTML = ''; 
+            
+            if (data.error) {
+                container.innerHTML = `<div style="padding:10px;color:red;">${data.error}</div>`;
+                return;
+            }
+            
+            if (data.files && data.files.length > 0) {
+                data.files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `<span class="file-icon">📄</span> ${file}`;
+                    fileItem.onclick = (e) => {
+                        e.stopPropagation();
+                        loadFile(expPath, file);
+                    };
+                    container.appendChild(fileItem);
+                });
+            } else {
+                 container.innerHTML = '<div style="padding:10px;color:#999;font-size:0.8rem;">(No files)</div>';
+            }
+            
+        } catch (err) {
+            container.innerHTML = '<div style="padding:10px;color:red;">Failed.</div>';
+        }
+    }
+
+    async function loadFile(expPath, fileName) {
+        const viewer = document.getElementById('file-viewer');
+        const pathDisplay = document.getElementById('current-file-path');
+        
+        pathDisplay.textContent = `${expPath}/${fileName}`;
+        viewer.innerHTML = '<div class="empty-state" style="color:#718096">Loading content...</div>';
+
+        try {
+            const response = await fetch(`${API_ROOT}/file?path=${encodeURIComponent(expPath)}&file=${encodeURIComponent(fileName)}`);
+            const data = await response.json();
+
+            if (data.error) {
+                viewer.innerHTML = `<pre style="color:red">${data.error}</pre>`;
+                return;
+            }
+
+            if (fileName.endsWith('.json')) {
+                try {
+                    const jsonObj = JSON.parse(data.content);
+                    const coloredJson = syntaxHighlight(jsonObj);
+                    viewer.innerHTML = `<pre>${coloredJson}</pre>`;
+                } catch (e) {
+                    viewer.innerHTML = `<pre>${escapeHtml(data.content)}</pre>`;
+                }
+            } else {
+                viewer.innerHTML = `<pre>${escapeHtml(data.content)}</pre>`;
+            }
+
+        } catch (error) {
+            viewer.innerHTML = `<pre style="color:red">Error loading file.</pre>`;
+        }
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                   .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function syntaxHighlight(json) {
+        if (typeof json != 'string') json = JSON.stringify(json, undefined, 2);
+        json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return json.replace(/("(\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+            var cls = 'json-number';
+            if (/^"/.test(match)) {
+                if (/:$/.test(match)) cls = 'json-key';
+                else cls = 'json-string';
+            } else if (/true|false/.test(match)) cls = 'json-boolean';
+            else if (/null/.test(match)) cls = 'json-null';
+            return '<span class="' + cls + '">' + match + '</span>';
+        });
+    }
+</script>
+
+</body>
+</html>

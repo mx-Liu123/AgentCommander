@@ -1,0 +1,72 @@
+{
+  "id": "parallel_graph",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "label": "Start",
+      "position": { "x": 50, "y": 300 },
+      "config": {}
+    },
+    {
+      "id": "parallel_node",
+      "type": "parallel_loop",
+      "label": "Parallel Execution (2 Branch)",
+      "position": { "x": 300, "y": 300 },
+      "config": {
+        "workers": 2,
+        "context_modifier": "# === Parallel Worker Setup ===\n# Available Vars: context, worker_idx, service\n# Target Vars: branch_idx, layer_idx, sub_idx\n\n# Example 1: Sequential Branching\ncontext['branch_idx'] = worker_idx + 1\n\n# Example 2: Same Branch, Different Params (Advanced)\n# if worker_idx == 0: context['custom_param'] = 0.1\n# else: context['custom_param'] = 0.5\n\nlogger.log(f\"[Worker {worker_idx}] Assigned to Branch {context.get('branch_idx')}\")",
+        "sub_graph": {
+          "nodes": [
+            { "id": "p_start", "type": "start", "label": "P-Start", "position": { "x": 50, "y": 150 }, "config": {} },
+            {
+              "id": "p_init",
+              "type": "python_script",
+              "label": "Init & Scan",
+              "position": { "x": 200, "y": 150 },
+              "config": {
+                "code": "context['cycle'] = context.get('cycle', 0) + 1\nbranch_path = service.tasks_dir / f\"Branch{context.get('branch_idx', 1)}\"\n# Create branch dir if not exists (since it might be new for this worker)\nif not branch_path.exists(): branch_path.mkdir(parents=True, exist_ok=True)\n\nvalid_exps, last_imp, last_att = service.scan_experiments(branch_path)\nl, s, parent_path = service.generate_next_node(context.get('branch_idx', 1), last_imp, last_att)\ncur_path = service.setup_workspace(branch_path, l, s, parent_path, context.get('branch_idx', 1))\ncontext['current_exp_path'] = str(cur_path)\ncontext['layer_idx'] = l\ncontext['sub_idx'] = s"
+              }
+            },
+            {
+              "id": "p_plan_write", "type": "llm_generate", "label": "Plan & Write", "position": { "x": 400, "y": 150 },
+              "config": { "model": "claude-cli", "timeout": 300, "output_vars": ["plan", "code_content"], "user_template": "Analyze and improve strategy for Branch {B}, Layer {L}.\nContext: {context}\nOutput JSON keys: plan, code_content." }
+            },
+            {
+              "id": "p_save", "type": "run_shell", "label": "Save", "position": { "x": 600, "y": 150 },
+              "config": { "command": "cat <<EOF > {current_exp_path}/strategy.py\n{code_content}\nEOF" }
+            },
+            {
+              "id": "p_eval", "type": "run_shell", "label": "Evaluate", "position": { "x": 750, "y": 150 },
+              "config": { "command": "export $(grep -v '^#' ../../best_param.env | xargs) && python ../../evaluator.py {current_exp_path}/strategy.py", "output_vars": ["test_output"] }
+            },
+            {
+              "id": "p_save_hist", "type": "write_history", "label": "Save Hist", "position": { "x": 950, "y": 150 },
+              "config": { "key": "result", "mode": "append", "value_template": "Worker {worker_idx} Result: {test_output}" }
+            },
+            { "id": "p_end", "type": "end", "label": "P-End", "position": { "x": 1100, "y": 150 }, "config": {} }
+          ],
+          "edges": [
+            { "source": "p_start", "target": "p_init" },
+            { "source": "p_init", "target": "p_plan_write" },
+            { "source": "p_plan_write", "target": "p_save" },
+            { "source": "p_save", "target": "p_eval" },
+            { "source": "p_eval", "target": "p_save_hist" },
+            { "source": "p_save_hist", "target": "p_end" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "label": "End",
+      "position": { "x": 600, "y": 300 },
+      "config": {}
+    }
+  ],
+  "edges": [
+    { "source": "start", "target": "parallel_node" },
+    { "source": "parallel_node", "target": "end" }
+  ]
+}

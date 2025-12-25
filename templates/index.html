@@ -1,0 +1,1677 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Commander - Node Editor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css"/>
+    <!-- Add Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', monospace; overflow: hidden; }
+        .console-box {
+            background-color: #1e1e1e; color: #d4d4d4; height: 600px;
+            overflow-y: auto; padding: 10px; font-family: 'Consolas', monospace;
+        }
+        .sidebar { height: 100vh; overflow-y: auto; border-right: 1px solid #444; z-index: 10; }
+        
+        /* Node Editor Styles */
+        .editor-container { position: relative; width: 100%; height: 100vh; overflow: hidden; background-color: #121212; }
+        .node-palette { position: absolute; left: 0; top: 0; bottom: 0; width: 250px; background: #1e1e1e; border-right: 1px solid #333; z-index: 5; padding: 10px; overflow-y: auto; }
+        .node-properties { position: absolute; right: 0; top: 0; bottom: 0; width: 350px; background: #1e1e1e; border-left: 1px solid #333; z-index: 5; padding: 15px; overflow-y: auto; }
+        .graph-canvas { width: 100%; height: 100%; cursor: grab; }
+        .graph-canvas:active { cursor: grabbing; }
+        
+        .node-rect { fill: #2d2d2d; stroke: #555; stroke-width: 2px; rx: 5; cursor: pointer; }
+        .node-rect.selected { stroke: #61dafb; stroke-width: 3px; }
+        .node-header { fill: #333; rx: 5; }
+        .node-text { fill: #fff; font-size: 14px; pointer-events: none; user-select: none; }
+        .node-subtext { fill: #aaa; font-size: 11px; pointer-events: none; }
+        
+        .port { fill: #555; stroke: #000; stroke-width: 1px; cursor: crosshair; }
+        .port:hover { fill: #61dafb; }
+        .port-in { fill: #4caf50; }
+        .port-out { fill: #f44336; }
+        
+        .edge { stroke: #666; stroke-width: 2px; fill: none; pointer-events: stroke; }
+        .edge:hover { stroke: #61dafb; stroke-width: 4px; cursor: pointer; }
+        .edge.selected { stroke: #61dafb; stroke-width: 3px; }
+        
+        /* Edge Label */
+        .edge-label-bg { fill: #222; opacity: 0.8; }
+        .edge-label-text { fill: #ddd; font-size: 10px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+        
+        /* D3 Visualization Styles */
+        .viz-container { width: 100%; height: 100vh; background-color: #1e1e1e; overflow: hidden; position: relative; }
+        .viz-sidebar {
+            position: absolute; right: 0; top: 0; bottom: 0; width: 400px;
+            background: #252526; border-left: 1px solid #444; z-index: 10;
+            padding: 15px; overflow-y: auto; transition: transform 0.3s ease;
+            transform: translateX(100%);
+        }
+        .viz-sidebar.open { transform: translateX(0); }
+        .viz-node rect { stroke: #fff; stroke-width: 1.5px; cursor: pointer; }
+        .viz-node text { font: 12px sans-serif; fill: #000; pointer-events: none; }
+        .viz-link { fill: none; stroke: #555; stroke-opacity: 0.6; stroke-width: 2px; }
+        
+        /* Modal text wrapping */
+        .modal-body pre { white-space: pre-wrap; word-wrap: break-word; }
+        
+        .breadcrumb-bar { position: absolute; top: 0; left: 250px; right: 350px; height: 40px; background: #252526; border-bottom: 1px solid #333; z-index: 4; display: flex; align-items: center; padding: 0 20px; }
+        .breadcrumb-item { cursor: pointer; color: #aaa; margin-right: 10px; }
+        .breadcrumb-item:hover { color: #fff; }
+        .breadcrumb-item.active { color: #fff; font-weight: bold; }
+        .breadcrumb-separator { color: #666; margin-right: 10px; }
+
+        .palette-item { 
+            background: #2d2d2d; padding: 10px; margin-bottom: 8px; border-radius: 4px; cursor: grab; border: 1px solid #444; 
+            display: flex; align-items: center;
+        }
+        .palette-item:hover { border-color: #61dafb; }
+
+        /* AI Right Sidebar */
+        .right-sidebar {
+            position: absolute; right: 0; top: 0; bottom: 0; width: 400px;
+            background: #1e1e1e; border-left: 1px solid #333; z-index: 20;
+            transition: transform 0.3s ease; transform: translateX(100%);
+            display: flex; flex-direction: column;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.3);
+        }
+        .right-sidebar.open { transform: translateX(0); }
+        
+        .ai-toggle-btn {
+            position: absolute; right: 20px; top: 15px; z-index: 15;
+        }
+
+        .chat-messages { overflow-y: auto; background: #1a1a1a; font-family: 'Segoe UI', sans-serif; }
+        .animate-pulse { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        
+        /* Utility */
+        .full-height { height: 100vh; }
+        
+        /* Custom Scrollbar for Webkit */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+    </style>
+</head>
+<body>
+    {% raw %}
+    <div id="app">
+        <!-- Main Layout -->
+        <div v-if="currentTab !== 'workflow' && currentTab !== 'viz'" class="container-fluid">
+            <div class="row">
+                <!-- Sidebar -->
+                <div class="col-md-2 bg-dark sidebar p-3">
+                    <h4 class="mb-4 text-primary">Agent Commander</h4>
+                    <div class="nav flex-column nav-pills">
+                        <button class="nav-link" :class="{active: currentTab==='control'}" @click="currentTab='control'">🤖 Control Panel</button>
+                        <button class="nav-link" :class="{active: currentTab==='explorer'}" @click="currentTab='explorer'">📁 File Explorer</button>
+                        <button class="nav-link" :class="{active: currentTab==='workflow'}" @click="currentTab='workflow'">⚙️ Workflow Editor</button>
+                        <button class="nav-link" :class="{active: currentTab==='viz'}" @click="currentTab='viz'; renderViz();">🌳 Progress Tree</button>
+                    </div>
+                    <hr>
+                    <div class="mt-auto">
+                        <small class="text-muted">Status:</small><br>
+                        <span :class="{'text-success': isRunning, 'text-secondary': !isRunning}">
+                            {{ isRunning ? '● Running' : '○ Idle' }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="col-md-10 p-4" style="height: 100vh; overflow-y: auto;">
+                    <div v-if="currentTab === 'control'">
+                        <div class="card p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="m-0">Control Panel</h5>
+                                <button class="btn btn-sm btn-outline-info" @click="startTour('control')">❓ Tutorial</button>
+                            </div>
+                            <div class="mb-3" id="tour-cp-root">
+                                <label>Root Directory</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" v-model="taskRoot">
+                                    <button class="btn btn-outline-secondary" @click="updateTaskRoot">Update Root</button>
+                                </div>
+                            </div>
+                            <div class="row g-3" id="tour-cp-mode">
+                                <div class="col-md-4">
+                                    <label for="cp-mode">Mode</label>
+                                    <select id="cp-mode" name="mode" class="form-select" v-model="config.mode">
+                                        <option value="new">Start New Branch</option>
+                                        <option value="resume">Resume Branch</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8" v-if="config.mode === 'new'">
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label>Branch Name (Optional)</label>
+                                            <input type="text" class="form-control form-control-sm" v-model="config.branch_name" placeholder="e.g. TestMA">
+                                        </div>
+                                        <div class="col-6">
+                                            <label>Parent Exp (Optional)</label>
+                                            <input type="text" class="form-control form-control-sm" v-model="config.parent_exp" placeholder="Branch_example/exp_example">
+                                        </div>
+                                        <div class="col-12">
+                                            <label>Branch Hint (Context)</label>
+                                            <input type="text" class="form-control form-control-sm" v-model="config.branch_hint" placeholder="Focus on...">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4" v-if="config.mode === 'resume'">
+                                    <label for="cp-branch">Branch</label>
+                                    <select id="cp-branch" name="branch" class="form-select" v-model="config.resume_branch_id">
+                                        <option v-for="b in availableBranches" :value="b.replace('Branch', '')">{{ b }}</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="cp-cycles">Cycles</label>
+                                    <input id="cp-cycles" name="cycles" type="number" class="form-control" v-model.number="config.n_cycles">
+                                </div>
+                            </div>
+                            
+                            <div id="tour-cp-vars-container">
+                                <div class="mt-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6>Global Variables</h6>
+                                        <button class="btn btn-sm btn-outline-success" @click="addGlobalVar">➕ Add</button>
+                                    </div>
+                                    <div v-if="Object.keys(config.global_vars).length === 0" class="text-muted font-italic mb-2">No global variables defined.</div>
+                                    <div v-for="(val, key) in config.global_vars" :key="key" class="input-group mb-2">
+                                        <span class="input-group-text font-monospace p-0" style="width: 30%;">
+                                            <input type="text" class="form-control border-0 bg-transparent shadow-none font-monospace text-center" 
+                                                   :value="key" 
+                                                   @change="renameGlobalVar(key, $event.target.value)"
+                                                   placeholder="KEY">
+                                        </span>
+                                        <textarea class="form-control" v-model="config.global_vars[key]" rows="1" 
+                                                  @dblclick="openEditor(key, config.global_vars[key])"
+                                                  title="Double click to edit in large box"></textarea>
+                                        <button class="btn btn-outline-danger" @click="removeGlobalVar(key)">🗑️</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <h6>LLM Changeable Vars</h6>
+                                    <input type="text" class="form-control" :value="config.llm_changeable_vars ? config.llm_changeable_vars.join(', ') : ''" @input="updateChangeableVars">
+                                </div>
+                            </div>
+
+                            <div class="mt-3" id="tour-cp-actions">
+                                <div class="btn-group w-100 mb-2">
+                                    <button class="btn btn-outline-primary" @click="saveConfig">💾 Save Config</button>
+                                    <button class="btn btn-outline-secondary" @click="saveConfigAs">Save As...</button>
+                                    <button class="btn btn-outline-secondary" @click="loadConfigFrom">Load...</button>
+                                </div>
+                                <button v-if="!isRunning" class="btn btn-primary w-100" @click="startAgent">▶ Start Agent</button>
+                                <div v-else class="d-flex gap-2">
+                                    <button class="btn btn-danger flex-grow-1" @click="stopAgent('force')">🛑 Stop</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="console-box" id="console">
+                            <div v-for="(log, i) in logs" :key="i" :class="{'log-error': log.type === 'error'}">
+                                <span class="text-muted">[{{ log.time }}]</span> {{ log.data }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="currentTab === 'explorer'">
+                        <div class="input-group mb-2" id="tour-fe-nav">
+                            <button class="btn btn-secondary" @click="goUpDir">⬆ Up</button>
+                            <input id="fe-root" type="text" class="form-control" v-model="explorerRoot" @change="loadFiles">
+                            <button class="btn btn-outline-secondary" @click="loadFiles">Go</button>
+                            <button class="btn btn-outline-success" @click="createNewFile">➕ New File</button>
+                            <button class="btn btn-outline-info" @click="loadFiles" title="Refresh">↻</button>
+                            <button class="btn btn-outline-info" @click="startTour('explorer')">❓ Tutorial</button>
+                        </div>
+                        <div class="card bg-dark border-secondary" id="tour-fe-list">
+                            <div class="card-body p-0" style="height: 80vh; overflow: auto;">
+                                <div class="list-group list-group-flush">
+                                    <div v-for="item in fileList" :key="item.path" 
+                                         class="list-group-item bg-dark border-secondary py-1 d-flex align-items-center px-2">
+                                        <button class="btn btn-sm text-start flex-grow-1 text-light border-0 bg-transparent text-truncate" @click="onFileClick(item)">
+                                            <span class="me-2">{{ item.type === 'folder' ? '📁' : '📄' }}</span>
+                                            {{ item.name }}
+                                        </button>
+                                        <div class="d-flex gap-1">
+                                            <button class="btn btn-sm btn-outline-primary py-0 px-2" @click.stop="copyItem(item)" title="Copy">📋</button>
+                                            <button class="btn btn-sm btn-outline-warning py-0 px-2" @click.stop="renameItem(item)" title="Rename">✏️</button>
+                                            <button class="btn btn-sm btn-outline-danger py-0 px-2" @click.stop="deleteItem(item)" title="Delete">🗑️</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visualization Tab (Full Screen like Workflow) -->
+        <div v-if="currentTab === 'viz'" class="container-fluid p-0">
+             <div class="d-flex bg-dark border-bottom border-secondary p-2 align-items-center" id="tour-viz-toolbar">
+                <button class="btn btn-sm btn-outline-light me-3" @click="currentTab='control'">← Back to Control</button>
+                <h5 class="m-0 text-light me-4">Progress Visualization</h5>
+                
+                <!-- Search Bar -->
+                <div class="input-group input-group-sm me-3" style="width: 300px;">
+                    <input type="text" class="form-control bg-dark text-light border-secondary" placeholder="Search Node (e.g. exp1.1.1)" v-model="searchQuery" @keyup.enter="searchVizNode">
+                    <button class="btn btn-outline-secondary" @click="searchVizNode">Search</button>
+                </div>
+                
+                <div class="form-check form-switch me-3">
+                    <input class="form-check-input" type="checkbox" id="cb-branch-box" v-model="showBranchBoxes" @change="renderViz">
+                    <label class="form-check-label text-light" for="cb-branch-box">Group Branches</label>
+                </div>
+                
+                <button class="btn btn-sm btn-outline-info ms-auto me-2" @click="renderViz">Refresh Tree</button>
+             </div>
+             
+             <!-- Wrapper for positioning -->
+             <div class="viz-wrapper" style="position: relative; width: 100%; height: 100vh; overflow: hidden;">
+                 <!-- D3 Canvas (D3 owns this) -->
+                 <div id="viz-canvas" style="width: 100%; height: 100%; background-color: #1e1e1e;"></div>
+                 
+                 <!-- Sidebar (Vue owns this) -->
+                 <div class="viz-sidebar" :class="{open: showVizSide}">
+                     <div class="d-flex justify-content-between align-items-center mb-3">
+                         <h5 class="m-0 text-light">Node Details</h5>
+                         <button class="btn btn-sm btn-close btn-close-white" @click="showVizSide=false"></button>
+                     </div>
+                     <div v-if="selectedVizNode">
+                         <h6 class="text-primary">{{ selectedVizNode.name }}</h6>
+                         
+                         <!-- Iterate over all history items -->
+                         <div v-for="(val, key) in selectedVizNode.full_history" :key="key" class="mb-3">
+                             <label class="text-muted small fw-bold" @dblclick="showItemDetail(key, val)" style="cursor: pointer; user-select: none;" title="Double-click to expand">{{ key }} 🔍</label>
+                             <!-- Simple values -->
+                             <input v-if="typeof val !== 'object' || val === null" type="text" class="form-control bg-dark text-light border-secondary" :value="val" readonly>
+                             <!-- Complex values (Objects/Arrays) -->
+                             <textarea v-else class="form-control font-monospace bg-dark text-light border-secondary" rows="4" readonly>{{ JSON.stringify(val, null, 2) }}</textarea>
+                         </div>
+                         
+                         <button class="btn btn-outline-light w-100 mt-2" @click="openFileInExplorer(selectedVizNode)">Open in Explorer</button>
+                     </div>
+                 </div>
+             </div>
+        </div>
+
+        <!-- File Preview/Edit Modal -->
+        <div class="modal fade" id="fileModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content bg-dark text-light">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title">{{ previewFile.name }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        <!-- Image Viewer -->
+                        <div v-if="previewFile.isImage" class="text-center p-3">
+                            <img :src="previewFile.content" class="img-fluid" style="max-height: 70vh;">
+                        </div>
+                        <!-- Text Editor -->
+                        <textarea v-else class="form-control font-monospace bg-dark text-light border-0 p-3" 
+                                  style="height: 70vh; resize: none;" 
+                                  v-model="previewFile.content"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary" v-if="!previewFile.isImage">
+                        <span class="text-success me-auto" v-if="saveStatus">{{ saveStatus }}</span>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" @click="saveFile">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflow Editor -->
+        <div v-if="currentTab === 'workflow'" class="editor-container">
+            <!-- AI Toggle Button -->
+            <button class="btn btn-primary ai-toggle-btn shadow-sm" @click="chatMinimized = !chatMinimized">
+                🤖 AI Assistant
+            </button>
+            
+            <!-- AI Right Sidebar -->
+            <div class="right-sidebar" :class="{open: !chatMinimized}">
+                <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center bg-dark">
+                    <h5 class="m-0 text-light">AI Assistant</h5>
+                    <button class="btn btn-sm btn-close btn-close-white" @click="chatMinimized = true"></button>
+                </div>
+                
+                <div class="chat-messages p-3 flex-grow-1" ref="chatContainer">
+                    <div v-for="(msg, i) in chatMessages" :key="i" class="mb-3" :class="msg.role === 'user' ? 'text-end' : 'text-start'">
+                        <div class="d-inline-block p-2 rounded text-start" :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-secondary text-light'" style="max-width: 90%;">
+                            <small class="d-block opacity-75 mb-1" style="font-size: 0.7rem;">{{ msg.role === 'user' ? 'You' : 'Gemini' }}</small>
+                            <div style="white-space: pre-wrap; font-size: 0.9rem;">{{ msg.content }}</div>
+                        </div>
+                    </div>
+                    <div v-if="isChatting" class="text-start mb-2">
+                        <span class="badge bg-secondary animate-pulse">Thinking...</span>
+                    </div>
+                </div>
+                
+                <div class="p-3 border-top border-secondary bg-dark">
+                    <div class="input-group input-group-sm mb-2">
+                        <select class="form-select bg-dark text-light border-secondary" v-model="chatModel">
+                            <option value="auto">Auto</option>
+                            <option value="flash">Flash</option>
+                            <option value="flash-lite">Flash Lite</option>
+                        </select>
+                        <button class="btn btn-outline-danger" @click="resetChatSession" title="New Session">🗑️ Reset</button>
+                    </div>
+                    <textarea class="form-control bg-dark text-light border-secondary mb-2" rows="3" v-model="chatInput" @keyup.enter.ctrl="sendChatMessage" placeholder="Describe changes (Ctrl+Enter to send)..."></textarea>
+                    <button class="btn btn-sm btn-success w-100" @click="sendChatMessage" :disabled="isChatting || !chatInput.trim()">Send Request</button>
+                </div>
+            </div>
+
+            <div class="node-palette" id="tour-wf-palette">
+                <button class="btn btn-sm btn-outline-light mb-3" @click="currentTab='control'">← Back to Control</button>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-light m-0">Components</h6>
+                    <button class="btn btn-sm btn-outline-info py-0 px-1" @click="startTour('workflow')" title="Tutorial">❓</button>
+                </div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'llm_generate')">🤖 LLM Generation</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'run_shell')">💻 Run Shell</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'python_script')">🐍 Python Script</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'write_history')">💾 Write History</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'lesson')">🎓 Generate Lessons</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'subloop')">📦 Subloop</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'check_improvement')">📊 Check Metric</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'condition_code')">❓ Condition Code</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'start')">🏁 Start</div>
+                <div class="palette-item" draggable="true" @dragstart="dragStart($event, 'end')">🛑 End</div>
+                
+                <div class="mt-4" id="tour-wf-actions">
+                     <h6 class="text-light">Actions</h6>
+                     <div class="d-flex gap-2 mb-2">
+                        <button class="btn btn-sm btn-outline-secondary flex-grow-1" @click="apiAction('load', {path: 'default'})" title="Reset to Sequential Template">Reset Seq</button>
+                        <button class="btn btn-sm btn-outline-secondary flex-grow-1" @click="apiAction('load', {path: 'parallel'})" title="Reset to Parallel Template">Reset Par</button>
+                     </div>
+                     <button class="btn btn-info w-100 mb-2" id="tour-wf-refresh" @click="refreshWorkflow">↻ Refresh from Cache</button>
+                     <button class="btn btn-success w-100 mb-2" id="tour-wf-save" @click="apiAction('update')">Save to Cache</button>
+                     <button class="btn btn-outline-light w-100 mb-2" @click="saveAsWorkflow">Save As...</button>
+                     <button class="btn btn-outline-light w-100 mb-2" @click="loadFromPath">Load File...</button>
+                </div>
+            </div>
+
+            <div class="breadcrumb-bar">
+                <div v-for="(level, idx) in graphStack" :key="idx" style="display:flex;">
+                    <span class="breadcrumb-item" :class="{active: idx === graphStack.length - 1}" @click="navToLevel(idx)">
+                        {{ level.name }}
+                    </span>
+                    <span v-if="idx < graphStack.length - 1" class="breadcrumb-separator">></span>
+                </div>
+            </div>
+
+            <svg class="graph-canvas" 
+                @mousemove="onMouseMove" @mouseup="onMouseUp" @mousedown="onMouseDown"
+                @dragover.prevent @drop="onDrop">
+                
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+                    </marker>
+                </defs>
+
+                <g :transform="`translate(${pan.x}, ${pan.y}) scale(${zoom})`">
+                    <!-- Edges -->
+                    <g v-for="edge in currentGraph.edges" :key="edge.source+edge.target">
+                        <path :d="getEdgePath(edge)" 
+                              class="edge" 
+                              marker-end="url(#arrowhead)"
+                              :class="{selected: selectedEdge === edge}"
+                              @click.stop="selectEdge(edge)" />
+                        <!-- Edge Label -->
+                        <g v-if="edge.label" :transform="getEdgeLabelPos(edge)">
+                            <rect x="-15" y="-10" width="30" height="20" class="edge-label-bg" rx="4" />
+                            <text class="edge-label-text">{{ edge.label }}</text>
+                        </g>
+                    </g>
+
+                    <!-- Temp Edge -->
+                    <path v-if="dragEdge" :d="getTempEdgePath()" class="edge" style="stroke-dasharray: 5,5;" />
+
+                    <!-- Nodes -->
+                    <g v-for="node in currentGraph.nodes" :key="node.id" 
+                       :transform="`translate(${node.position.x}, ${node.position.y})`"
+                       @mousedown.stop="nodeMouseDown($event, node)"
+                       @dblclick.stop="nodeDblClick(node)">
+                        
+                        <rect class="node-rect" :class="{selected: selectedNode === node}" width="180" height="80" />
+                        <rect class="node-header" width="180" height="25" fill="#444" />
+                        <text x="10" y="18" class="node-text" style="font-weight:bold; font-size:12px;">{{ node.label || node.type }}</text>
+                        <text x="10" y="50" class="node-text">{{ node.type }}</text>
+                        
+                        <!-- Standard Ports -->
+                        <g v-if="node.type !== 'condition_code'">
+                            <circle :cx="node.flip ? 0 : 180" cy="40" r="6" class="port port-out" @mousedown.stop="portMouseDown($event, node, 'out')" />
+                        </g>
+                        
+                        <!-- Condition Node Ports (True/False) -->
+                        <g v-else>
+                            <text :x="node.flip ? 10 : 170" y="30" fill="#4caf50" font-size="10" :text-anchor="node.flip ? 'start' : 'end'">True</text>
+                            <circle :cx="node.flip ? 0 : 180" cy="25" r="6" class="port port-out" fill="#4caf50" @mousedown.stop="portMouseDown($event, node, 'out', 'true')" />
+                            
+                            <text :x="node.flip ? 10 : 170" y="60" fill="#f44336" font-size="10" :text-anchor="node.flip ? 'start' : 'end'">False</text>
+                            <circle :cx="node.flip ? 0 : 180" cy="55" r="6" class="port port-out" fill="#f44336" @mousedown.stop="portMouseDown($event, node, 'out', 'false')" />
+                        </g>
+                        
+                        <!-- Input Port (All nodes) -->
+                        <circle :cx="node.flip ? 180 : 0" cy="40" r="6" class="port port-in" @mouseup.stop="portMouseUp($event, node)" />
+                    </g>
+                </g>
+            </svg>
+            
+            <div class="node-properties" v-if="selectedNode">
+                <h5>Properties: {{ selectedNode.type }}</h5>
+                <div class="mb-3">
+                    <label>Label</label>
+                    <input type="text" class="form-control" v-model="selectedNode.label">
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" v-model="selectedNode.flip" id="flip-check">
+                    <label class="form-check-label" for="flip-check">Flip Ports (In/Out)</label>
+                </div>
+                
+                <div v-if="selectedNode.type === 'python_script'">
+                    <label>Python Code</label>
+                    <textarea class="form-control font-monospace" rows="12" v-model="selectedNode.config.code" @dblclick="expandText($event.target.value, 'code')"></textarea>
+                </div>
+                
+                <div v-if="selectedNode.type === 'subloop'">
+                    <div class="alert alert-info">Double-click node on canvas to edit sub-graph.</div>
+                </div>
+
+                <div v-if="selectedNode.type === 'parallel_loop'">
+                    <label>Workers</label>
+                    <input type="number" class="form-control mb-2" v-model.number="selectedNode.config.workers">
+                    <label>Context Modifier (Python)</label>
+                    <textarea class="form-control font-monospace mb-2" rows="6" v-model="selectedNode.config.context_modifier" @dblclick="expandText($event.target.value, 'context_modifier')"></textarea>
+                    <small class="text-muted">Vars: context, worker_idx, service</small>
+                    <div class="alert alert-info mt-2">Double-click node to edit sub-graph.</div>
+                </div>
+
+                <div v-if="selectedNode.type === 'llm_generate'">
+                    <label>Model</label>
+                    <select class="form-select mb-2" v-model="selectedNode.config.model">
+                        <option value="auto">Auto</option>
+                        <option value="flash-lite">Flash Lite</option>
+                        <option value="flash">Flash</option>
+                        <option value="claude-cli">Claude CLI</option>
+                    </select>
+                    <label>Timeout</label>
+                    <input type="number" class="form-control mb-2" v-model.number="selectedNode.config.timeout">
+                    
+                    <label>Prompt Template</label>
+                    <textarea class="form-control font-monospace mb-2" rows="6" v-model="selectedNode.config.user_template" @dblclick="expandText($event.target.value, 'user_template')"></textarea>
+                    
+                    <hr class="border-secondary">
+                    <label class="mb-1 text-info">Session Management</label>
+                    <select class="form-select mb-3" v-model="selectedNode.config.session_mode">
+                        <option value="new">Start New Session</option>
+                        <option value="inherit">Inherit Session</option>
+                    </select>
+
+                    <div v-if="selectedNode.config.session_mode === 'inherit'" class="mb-3">
+                        <label class="small text-muted">Parent Session ID (Input Var)</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" v-model="selectedNode.config.session_id_input" placeholder="e.g. session_v1">
+                    </div>
+
+                    <label class="mb-1 text-success">Outputs</label>
+                    <div class="card bg-dark border-secondary mb-2">
+                        <div class="card-body p-2">
+                            <label class="small text-muted">Response Content (Var Name)</label>
+                            <input type="text" class="form-control form-control-sm bg-black text-light border-secondary mb-2" v-model="selectedNode.config.response_output">
+                            
+                            <div v-if="selectedNode.config.session_mode === 'new'">
+                                <label class="small text-muted">New Session ID (Var Name)</label>
+                                <input type="text" class="form-control form-control-sm bg-black text-light border-secondary" v-model="selectedNode.config.session_id_output">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div v-if="selectedNode.type === 'run_shell'">
+                    <label>Command</label>
+                    <textarea class="form-control font-monospace mb-2" rows="3" v-model="selectedNode.config.command" @dblclick="expandText($event.target.value, 'command')"></textarea>
+                    <label>Timeout</label>
+                    <input type="number" class="form-control mb-2" v-model.number="selectedNode.config.timeout">
+                    <label>Output Vars</label>
+                    <input type="text" class="form-control" v-model="selectedNode.config.output_vars">
+                </div>
+
+                <div v-if="selectedNode.type === 'write_history'">
+                    <label>Key</label>
+                    <input type="text" class="form-control mb-2" v-model="selectedNode.config.key">
+                    <label>Mode</label>
+                    <select class="form-select mb-2" v-model="selectedNode.config.mode">
+                        <option value="overwrite">Overwrite</option>
+                        <option value="append">Append</option>
+                        <option value="update">Update</option>
+                    </select>
+                    <label>Value Type</label>
+                    <select class="form-select mb-2" v-model="selectedNode.config.value_type">
+                        <option value="string">String</option>
+                        <option value="json">JSON</option>
+                        <option value="boolean">Boolean</option>
+                    </select>
+                    <label>Template</label>
+                    <textarea class="form-control font-monospace" rows="3" v-model="selectedNode.config.value_template" @dblclick="expandText($event.target.value, 'value_template')"></textarea>
+                </div>
+
+                <div v-if="selectedNode.type === 'condition_code'">
+                    <label>Python Condition</label>
+                    <textarea class="form-control font-monospace" rows="4" v-model="selectedNode.config.code" @dblclick="expandText($event.target.value, 'code')"></textarea>
+                    <small class="text-muted">Must set local `result` = True/False</small>
+                </div>
+
+                <div v-if="selectedNode.type === 'check_improvement'">
+                    <label>Metric Key</label>
+                    <input type="text" class="form-control" v-model="selectedNode.config.metric_key">
+                </div>
+
+                <div v-if="selectedNode.type === 'lesson'">
+                    <label>Lookback Count</label>
+                    <input type="number" class="form-control mb-2" v-model.number="selectedNode.config.lookback_count">
+                    <label>Scope</label>
+                    <select class="form-select mb-2" v-model="selectedNode.config.scope">
+                        <option value="Same Branch/Layer">Same Branch/Layer</option>
+                        <option value="All History">All History</option>
+                    </select>
+                    <label>Filter</label>
+                    <select class="form-select mb-2" v-model="selectedNode.config.filter">
+                        <option value="Failures Only">Failures Only</option>
+                        <option value="Successes Only">Successes Only</option>
+                        <option value="All">All</option>
+                    </select>
+                    <label>Output Var</label>
+                    <input type="text" class="form-control" v-model="selectedNode.config.output_var">
+                </div>
+
+                <button class="btn btn-secondary mt-3 w-100" @click="duplicateNode">Duplicate Node</button>
+                <button class="btn btn-danger mt-2 w-100" @click="deleteNode">Delete Node</button>
+            </div>
+            
+             <div class="node-properties" v-if="selectedEdge">
+                <h5>Edge Properties</h5>
+                <div class="mb-3">
+                    <label>Label (Condition)</label>
+                    <input type="text" class="form-control" v-model="selectedEdge.label" placeholder="true / false / empty">
+                    <small class="text-muted">Used for branching after Condition nodes.</small>
+                </div>
+                <button class="btn btn-danger mt-3 w-100" @click="deleteEdge">Delete Edge</button>
+             </div>
+        </div>
+        <!-- Large Text Editor Modal -->
+        <div class="modal fade" id="largeEditorModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content bg-dark text-light border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title">Edit: {{ editorState.key }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <textarea v-model="editorState.value" class="form-control bg-dark text-light border-secondary font-monospace" rows="15" style="font-size: 0.9rem;"></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" @click="saveEditor">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    {% endraw %}
+
+    <script>
+        const { createApp, ref, onMounted, reactive, nextTick, computed } = Vue;
+        const socket = io();
+
+        createApp({
+            setup() {
+                const currentTab = ref('control');
+                const isRunning = ref(false);
+                const logs = ref([]);
+                const taskRoot = ref('');     // For Agent execution
+                const explorerRoot = ref(''); // For File Explorer viewing
+                const fileList = ref([]); // Flat list for current dir
+                const availableBranches = ref([]);
+                const previewFile = ref({ name: '', content: '', path: '', isImage: false, editingNodeProp: null });
+                const showVizSide = ref(false);
+                const selectedVizNode = ref(null);
+                const searchQuery = ref('');
+                const showBranchBoxes = ref(true); // Toggle state
+                const saveStatus = ref('');
+                let fileModal = null;
+                
+                // D3 State for Search
+                let vizZoom = null;
+                let vizSvg = null;
+                let vizNodesData = [];
+                let vizWidth = 0;
+                let vizHeight = 0;
+                
+                // Chat State
+                const chatMessages = ref([{role: 'assistant', content: 'Hi! I can help you modify the workflow. Try "Add a standard node after step 2".'}]);
+                const chatInput = ref('');
+                const isChatting = ref(false);
+                const chatModel = ref('auto');
+                const chatSessionId = ref(null);
+                const chatMinimized = ref(true);
+                const chatContainer = ref(null);
+
+                const expandText = (content, fieldKey) => {
+                     previewFile.value = { 
+                         name: `Editing: ${fieldKey}`, 
+                         content: content, 
+                         isImage: false, 
+                         editingNodeProp: fieldKey 
+                     };
+                     saveStatus.value = '';
+                     fileModal.show();
+                };
+                
+                const config = ref({
+                    mode: 'new', resume_branch_id: '', n_cycles: 1, 
+                    global_vars: {}, llm_changeable_vars: [], workflow: {}
+                });
+
+                // Graph Editor State
+                const graphStack = ref([]); 
+                const currentGraph = ref({ nodes: [], edges: [] });
+                const pan = ref({ x: 0, y: 0 });
+                const zoom = ref(1);
+                const selectedNode = ref(null);
+                const selectedEdge = ref(null);
+                const dragEdge = ref(null); 
+                
+                let isDraggingNode = false;
+                let isPanning = false;
+                let lastMousePos = { x: 0, y: 0 };
+
+                onMounted(async () => {
+                    try {
+                        // Init Bootstrap Modal
+                        fileModal = new bootstrap.Modal(document.getElementById('fileModal'));
+                        
+                        const res = await fetch('/api/config');
+                        if (res.ok) {
+                            const data = await res.json();
+                            taskRoot.value = data.root_dir;
+                            explorerRoot.value = data.root_dir;
+                            availableBranches.value = data.branches;
+                            if (Object.keys(config.value.global_vars).length === 0 && data.default_global_vars) config.value.global_vars = data.default_global_vars;
+                            if (config.value.llm_changeable_vars.length === 0 && data.default_llm_changeable_vars) config.value.llm_changeable_vars = data.default_llm_changeable_vars;
+                        }
+
+                        // Restore Status & Logs
+                        const statusRes = await fetch('/api/status');
+                        if (statusRes.ok) {
+                            const sData = await statusRes.json();
+                            isRunning.value = sData.isRunning;
+                            logs.value = sData.logs || [];
+                            nextTick(() => {
+                                const c = document.getElementById('console');
+                                if(c) c.scrollTop = c.scrollHeight;
+                            });
+                        }
+                        
+                        await loadFiles();
+                        await loadWorkflowFromCache();
+                    } catch (e) {
+                        console.error("Init failed:", e);
+                    }
+                });
+
+                const loadFiles = async () => {
+                    const res = await fetch(`/api/files?path=${encodeURIComponent(explorerRoot.value)}`);
+                    if(res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) fileList.value = data;
+                        else if (data.children) {
+                            fileList.value = data.children;
+                            if (data.path) explorerRoot.value = data.path;
+                        }
+                    }
+                };
+                
+                const currentRelPath = ref(""); 
+                
+                const onFileClick = async (item) => {
+                    if (item.type === 'folder') {
+                        explorerRoot.value = item.path; 
+                        await loadFiles();
+                    } else {
+                        // File Preview/Edit
+                        const isImg = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(item.name);
+                        previewFile.value = { 
+                            name: item.name, 
+                            path: item.path,
+                            isImage: isImg,
+                            content: 'Loading...',
+                            editingNodeProp: null
+                        };
+                        saveStatus.value = '';
+                        fileModal.show();
+                        
+                        try {
+                            const res = await fetch(`/api/file_content?path=${encodeURIComponent(item.path)}`);
+                            if(res.ok) {
+                                const data = await res.json();
+                                if (isImg) {
+                                    const ext = item.name.split('.').pop().toLowerCase();
+                                    let mime = 'image/png';
+                                    if (ext === 'jpg' || ext === 'jpeg') mime = 'image/jpeg';
+                                    else if (ext === 'svg') mime = 'image/svg+xml';
+                                    
+                                    previewFile.value.content = `data:${mime};base64,${data.content}`;
+                                } else {
+                                    previewFile.value.content = data.content;
+                                }
+                            } else {
+                                previewFile.value.content = "Error loading file.";
+                            }
+                        } catch (e) {
+                            previewFile.value.content = "Error: " + e.message;
+                        }
+                    }
+                };
+                
+                const saveFile = async () => {
+                    if (previewFile.value.isImage) return;
+                    
+                    if (previewFile.value.editingNodeProp && selectedNode.value) {
+                        selectedNode.value.config[previewFile.value.editingNodeProp] = previewFile.value.content;
+                        saveStatus.value = 'Updated node property locally!';
+                        setTimeout(() => {
+                             saveStatus.value = '';
+                             fileModal.hide();
+                        }, 500);
+                        return;
+                    }
+
+                    saveStatus.value = 'Saving...';
+                    try {
+                        const res = await fetch('/api/save_file', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                path: previewFile.value.path,
+                                content: previewFile.value.content
+                            })
+                        });
+                        if (res.ok) {
+                            saveStatus.value = 'Saved successfully!';
+                            setTimeout(() => saveStatus.value = '', 2000);
+                        } else {
+                            const data = await res.json();
+                            saveStatus.value = 'Error: ' + (data.error || 'Unknown error');
+                        }
+                    } catch (e) {
+                        saveStatus.value = 'Error: ' + e.message;
+                    }
+                };
+
+                const deleteItem = async (item) => {
+                    if(!confirm(`Delete ${item.type}: ${item.name}?\nCannot be undone.`)) return;
+                    try {
+                        const res = await fetch('/api/delete_path', {
+                            method: 'DELETE', headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ path: item.rel_path })
+                        });
+                        if(res.ok) await loadFiles();
+                        else alert((await res.json()).error);
+                    } catch(e) { alert(e.message); }
+                };
+                
+                const goUpDir = async () => {
+                    const parts = explorerRoot.value.split('/').filter(p=>p);
+                    parts.pop();
+                    explorerRoot.value = '/' + parts.join('/');
+                    if(explorerRoot.value === '//') explorerRoot.value = '/';
+                    await loadFiles();
+                };
+
+                const createNewFile = async () => {
+                    const name = prompt("Enter new file name (e.g. notes.txt):");
+                    if (!name) return;
+                    
+                    const relPath = explorerRoot.value === '/' || explorerRoot.value === '' ? name : `${explorerRoot.value.replace(/^\/+/,'')}/${name}`;
+                    
+                    try {
+                        const res = await fetch('/api/save_file', {
+                            method: 'POST', headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ path: relPath, content: '' })
+                        });
+                        if (res.ok) await loadFiles();
+                        else alert((await res.json()).error);
+                    } catch(e) { alert(e.message); }
+                };
+
+                const copyItem = async (item) => {
+                    const newName = prompt(`Copy ${item.name} to (relative path):`, item.rel_path + '_copy');
+                    if (!newName) return;
+                    
+                    try {
+                        const res = await fetch('/api/copy_path', {
+                            method: 'POST', headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ src_path: item.rel_path, dest_path: newName })
+                        });
+                        if (res.ok) await loadFiles();
+                        else alert((await res.json()).error);
+                    } catch(e) { alert(e.message); }
+                };
+
+                const renameItem = async (item) => {
+                    const newName = prompt(`Rename ${item.name} to (relative path):`, item.rel_path);
+                    if (!newName || newName === item.rel_path) return;
+                    
+                    try {
+                        const res = await fetch('/api/rename_path', {
+                            method: 'POST', headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ old_path: item.rel_path, new_path: newName })
+                        });
+                        if (res.ok) await loadFiles();
+                        else alert((await res.json()).error);
+                    } catch(e) { alert(e.message); }
+                };
+
+                const loadWorkflowFromCache = async () => {
+                    const res = await fetch(`/api/workflow`);
+                    if(res.ok) {
+                        const data = await res.json();
+                        
+                        // Handle Graph
+                        // If root object has 'nodes', use it directly. Else look for 'workflow' key.
+                        if (data.nodes) config.value.workflow = data;
+                        else if (data.workflow) config.value.workflow = data.workflow;
+                        
+                        // Handle Extra Config
+                        if (data.global_vars) config.value.global_vars = data.global_vars;
+                        if (data.llm_changeable_vars) config.value.llm_changeable_vars = data.llm_changeable_vars;
+
+                        graphStack.value = [{ graph: config.value.workflow, name: 'Main Loop' }];
+                        currentGraph.value = config.value.workflow;
+                        pan.value = {x: 0, y: 0};
+                    }
+                };
+                
+                const refreshWorkflow = async () => {
+                    await loadWorkflowFromCache();
+                };
+
+                const apiAction = async (action, payload = {}) => {
+                    let body = { action, ...payload };
+                    // Send content + config for both Update (Cache) and Save As
+                    if (action === 'update' || action === 'save_as') {
+                        body.content = config.value.workflow; 
+                        body.global_vars = config.value.global_vars;
+                        body.llm_changeable_vars = config.value.llm_changeable_vars;
+                    }
+                    
+                    const res = await fetch('/api/workflow', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(body)
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        if (action === 'load') refreshWorkflow();
+                        else if (action === 'update') alert("Saved to Cache!");
+                        else if (action === 'save_as' && data.saved_path) alert(`Saved to:\n${data.saved_path}`);
+                        else alert("Action successful!");
+                    } else {
+                        alert(`Action failed: ${data.error || 'Unknown error'}`);
+                    }
+                };
+
+                const saveAsWorkflow = () => {
+                    const path = prompt("Enter save path (relative to root):", "my_workflows/workflow_v1.json");
+                    if (path) {
+                        const absPath = taskRoot.value.replace(/\/+$/, '') + '/' + path;
+                        if(confirm(`Save to:\n${absPath}\n\nConfirm?`)) {
+                            apiAction('save_as', { path });
+                        }
+                    }
+                };
+
+                const loadFromPath = () => {
+                    const path = prompt("Enter file path to load (relative to root):", "my_workflows/workflow_v1.json");
+                    if (path) {
+                        const absPath = taskRoot.value.replace(/\/+$/, '') + '/' + path;
+                        if(confirm(`Load from:\n${absPath}\n\nConfirm?`)) {
+                            apiAction('load', { path });
+                        }
+                    }
+                };
+
+                const navToLevel = (idx) => {
+                    graphStack.value.splice(idx + 1);
+                    currentGraph.value = graphStack.value[idx].graph;
+                    selectedNode.value = null;
+                };
+
+                const nodeDblClick = (node) => {
+                    if (node.type === 'subloop' || node.type === 'parallel_loop') {
+                        if (!node.config.sub_graph) {
+                            node.config.sub_graph = { nodes: [], edges: [] };
+                        }
+                        graphStack.value.push({ graph: node.config.sub_graph, name: node.label || 'Subloop' });
+                        currentGraph.value = node.config.sub_graph;
+                        selectedNode.value = null;
+                    }
+                };
+
+                const dragStart = (ev, type) => ev.dataTransfer.setData('nodeType', type);
+
+                const onDrop = (ev) => {
+                    const type = ev.dataTransfer.getData('nodeType');
+                    if (!type) return;
+                    
+                    const rect = ev.currentTarget.getBoundingClientRect();
+                    const x = (ev.clientX - rect.left - pan.value.x) / zoom.value;
+                    const y = (ev.clientY - rect.top - pan.value.y) / zoom.value;
+                    
+                    const newNode = {
+                        id: 'n_' + Date.now(),
+                        type: type,
+                        label: type.replace('_', ' '),
+                        position: { x, y },
+                        config: {}
+                    };
+                    
+                    if (type === 'llm_generate') newNode.config = { 
+                        model: 'auto', timeout: 600, user_template: '', 
+                        session_mode: 'new', response_output: 'llm_response', session_id_output: 'session_id' 
+                    };
+                    else if (type === 'subloop') newNode.config = { sub_graph: { nodes:[], edges:[] } };
+                    else if (type === 'lesson') newNode.config = { lookback_count: 5, scope: 'Same Branch/Layer', filter: 'Failures Only', output_var: 'lessons' };
+
+                    currentGraph.value.nodes.push(newNode);
+                };
+
+                const onMouseDown = (ev) => {
+                    if (ev.button === 0) {
+                        selectedNode.value = null;
+                        selectedEdge.value = null;
+                        isPanning = true;
+                        lastMousePos = { x: ev.clientX, y: ev.clientY };
+                    }
+                };
+
+                const nodeMouseDown = (ev, node) => {
+                    isDraggingNode = true;
+                    selectedNode.value = node;
+                    selectedEdge.value = null;
+                    lastMousePos = { x: ev.clientX, y: ev.clientY };
+                };
+                
+                const portMouseDown = (ev, node, type, label = null) => {
+                    ev.stopPropagation();
+                    if (type === 'out') {
+                        const rect = ev.target.getBoundingClientRect();
+                        const svgRect = document.querySelector('.graph-canvas').getBoundingClientRect();
+                        const startX = (rect.left + rect.width/2 - svgRect.left - pan.value.x) / zoom.value;
+                        const startY = (rect.top + rect.height/2 - svgRect.top - pan.value.y) / zoom.value;
+                        dragEdge.value = { sourceNode: node, startX, startY, currX: startX, currY: startY, label: label };
+                    }
+                };
+                
+                const portMouseUp = (ev, node) => {
+                    ev.stopPropagation();
+                    if (dragEdge.value) {
+                        if (dragEdge.value.sourceNode.id === node.id) {
+                            dragEdge.value = null;
+                            return;
+                        }
+                        
+                        // Check for multiple outgoing edges (Linear Restriction)
+                        const sourceId = dragEdge.value.sourceNode.id;
+                        const sourceType = dragEdge.value.sourceNode.type;
+                        const newLabel = dragEdge.value.label;
+                        const existingEdges = currentGraph.value.edges.filter(e => e.source === sourceId);
+                        
+                        if (sourceType === 'condition_code') {
+                            // Allow max 1 edge per label (true/false)
+                            const sameLabelEdge = existingEdges.find(e => e.label === newLabel);
+                            if (sameLabelEdge) {
+                                alert(`Condition node already has a '${newLabel}' path.`);
+                                dragEdge.value = null;
+                                return;
+                            }
+                        } else if (existingEdges.length > 0) {
+                            alert("Non-condition nodes can only have one outgoing edge (Linear Flow).");
+                            dragEdge.value = null;
+                            return;
+                        }
+                        
+                        // Check duplicate
+                        const exists = currentGraph.value.edges.find(e => e.source === sourceId && e.target === node.id);
+                        if (!exists) {
+                            currentGraph.value.edges.push({
+                                source: sourceId,
+                                target: node.id,
+                                label: dragEdge.value.label // Apply True/False label if from Condition node
+                            });
+                        }
+                        dragEdge.value = null;
+                    }
+                };
+
+                const onMouseMove = (ev) => {
+                    if (isPanning) {
+                        pan.value.x += ev.clientX - lastMousePos.x;
+                        pan.value.y += ev.clientY - lastMousePos.y;
+                        lastMousePos = { x: ev.clientX, y: ev.clientY };
+                    }
+                    else if (isDraggingNode && selectedNode.value) {
+                        const dx = (ev.clientX - lastMousePos.x) / zoom.value;
+                        const dy = (ev.clientY - lastMousePos.y) / zoom.value;
+                        selectedNode.value.position.x += dx;
+                        selectedNode.value.position.y += dy;
+                        lastMousePos = { x: ev.clientX, y: ev.clientY };
+                    }
+                    else if (dragEdge.value) {
+                         const svgRect = ev.currentTarget.getBoundingClientRect();
+                         dragEdge.value.currX = (ev.clientX - svgRect.left - pan.value.x) / zoom.value;
+                         dragEdge.value.currY = (ev.clientY - svgRect.top - pan.value.y) / zoom.value;
+                    }
+                };
+
+                const onMouseUp = () => {
+                    isPanning = false;
+                    isDraggingNode = false;
+                    dragEdge.value = null;
+                };
+
+                const deleteNode = () => {
+                    if(!selectedNode.value) return;
+                    const idx = currentGraph.value.nodes.indexOf(selectedNode.value);
+                    if(idx > -1) {
+                        const nid = selectedNode.value.id;
+                        currentGraph.value.nodes.splice(idx, 1);
+                        currentGraph.value.edges = currentGraph.value.edges.filter(e => e.source !== nid && e.target !== nid);
+                        selectedNode.value = null;
+                    }
+                };
+
+                const duplicateNode = () => {
+                    if (!selectedNode.value) return;
+                    
+                    // Deep copy current node
+                    const newNode = JSON.parse(JSON.stringify(selectedNode.value));
+                    
+                    // Generate new ID and offset position
+                    newNode.id = 'n_' + Date.now() + Math.floor(Math.random() * 100);
+                    newNode.position.x += 40;
+                    newNode.position.y += 40;
+                    
+                    // Add to graph
+                    currentGraph.value.nodes.push(newNode);
+                    
+                    // Auto-select the new node
+                    selectedNode.value = newNode;
+                };
+                
+                const deleteEdge = () => {
+                    if(!selectedEdge.value) return;
+                     const idx = currentGraph.value.edges.indexOf(selectedEdge.value);
+                     if(idx > -1) currentGraph.value.edges.splice(idx, 1);
+                     selectedEdge.value = null;
+                };
+
+                const selectEdge = (edge) => {
+                    selectedEdge.value = edge;
+                    selectedNode.value = null;
+                };
+
+                const getEdgePath = (edge) => {
+                    const src = currentGraph.value.nodes.find(n => n.id === edge.source);
+                    const tgt = currentGraph.value.nodes.find(n => n.id === edge.target);
+                    if(!src || !tgt) return '';
+                    
+                    // Start Point
+                    let x1 = src.flip ? src.position.x : src.position.x + 180; 
+                    let y1 = src.position.y + 40;
+                    if (src.type === 'condition_code') {
+                        if (edge.label === 'true') y1 = src.position.y + 25;
+                        else if (edge.label === 'false') y1 = src.position.y + 55;
+                    }
+                    
+                    // End Point
+                    const x2 = tgt.flip ? tgt.position.x + 180 : tgt.position.x;
+                    const y2 = tgt.position.y + 40;
+                    
+                    // Control Points (Handles)
+                    const dist = 80; // Distance to extend out from port
+                    const cp1x = x1 + (src.flip ? -dist : dist);
+                    const cp1y = y1;
+                    const cp2x = x2 + (tgt.flip ? dist : -dist);
+                    const cp2y = y2;
+                    
+                    return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+                };
+
+                const getEdgeLabelPos = (edge) => {
+                    const src = currentGraph.value.nodes.find(n => n.id === edge.source);
+                    const tgt = currentGraph.value.nodes.find(n => n.id === edge.target);
+                    if(!src || !tgt) return 'translate(0,0)';
+                    
+                    let x1 = src.flip ? src.position.x : src.position.x + 180; 
+                    let y1 = src.position.y + 40;
+                    
+                    if (src.type === 'condition_code') {
+                        if (edge.label === 'true') y1 = src.position.y + 25;
+                        else if (edge.label === 'false') y1 = src.position.y + 55;
+                    }
+                    
+                    const x2 = tgt.flip ? tgt.position.x + 180 : tgt.position.x;
+                    const y2 = tgt.position.y + 40;
+                    return `translate(${(x1+x2)/2}, ${(y1+y2)/2})`;
+                };
+                
+                const getTempEdgePath = () => {
+                    if(!dragEdge.value) return '';
+                    let { startX, startY, currX, currY, sourceNode } = dragEdge.value;
+                    
+                    const dist = 80;
+                    const cp1x = startX + (sourceNode.flip ? -dist : dist);
+                    const cp1y = startY;
+                    const cp2x = currX - dist; // Assuming dragging to a non-flipped input for simplicity, or just generally leftward
+                    const cp2y = currY;
+                    
+                    return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${currX} ${currY}`;
+                };
+
+                const updateChangeableVars = (e) => config.value.llm_changeable_vars = e.target.value.split(',').map(s=>s.trim()).filter(s=>s);
+                
+                const addGlobalVar = () => {
+                    const key = `NEW_VAR_${Date.now()}`;
+                    config.value.global_vars[key] = "";
+                };
+
+                const removeGlobalVar = (key) => {
+                    if(confirm(`Delete variable {${key}}?`)) {
+                        delete config.value.global_vars[key];
+                    }
+                };
+
+                const renameGlobalVar = (oldKey, newKey) => {
+                    if (oldKey === newKey) return;
+                    if (config.value.global_vars[newKey] !== undefined) {
+                        alert(`Key "${newKey}" already exists.`);
+                        return;
+                    }
+                    const val = config.value.global_vars[oldKey];
+                    delete config.value.global_vars[oldKey];
+                    config.value.global_vars[newKey] = val;
+                };
+
+                const saveConfig = async () => {
+                    try {
+                        // Include root_dir from separate model if needed
+                        const payload = {
+                            ...config.value,
+                            root_dir: taskRoot.value 
+                        };
+                        const res = await fetch('/api/save_config', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(payload)
+                        });
+                        if(res.ok) alert("Configuration saved!");
+                        else alert("Failed to save config.");
+                    } catch(e) {
+                        alert("Error saving config: " + e.message);
+                    }
+                };
+
+                const saveConfigAs = async () => {
+                    const path = prompt("Save Config As (relative to root):", "config_v1.json");
+                    if (!path) return;
+                    
+                    try {
+                        const payload = {
+                            path: path,
+                            config: {
+                                ...config.value,
+                                root_dir: taskRoot.value
+                            }
+                        };
+                        const res = await fetch('/api/save_config_as', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(payload)
+                        });
+                        if(res.ok) alert(`Config saved to ${path} and set as active.`);
+                        else alert("Failed to save config as.");
+                    } catch(e) {
+                        alert("Error: " + e.message);
+                    }
+                };
+
+                const loadConfigFrom = async () => {
+                    const path = prompt("Load Config From (relative to root):", "config.json");
+                    if (!path) return;
+                    
+                    try {
+                        const res = await fetch('/api/load_config_from', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ path: path })
+                        });
+                        
+                        if(res.ok) {
+                            const data = await res.json();
+                            const newConf = data.config;
+                            
+                            // Update UI State
+                            taskRoot.value = newConf.root_dir || taskRoot.value;
+                            explorerRoot.value = taskRoot.value;
+                            
+                            config.value.global_vars = newConf.global_vars || {};
+                            config.value.llm_changeable_vars = newConf.llm_changeable_vars || [];
+                            config.value.n_cycles = newConf.n_cycles || 1;
+                            
+                            // Re-fetch branches as root might have changed
+                            const res2 = await fetch('/api/config'); 
+                            if(res2.ok) {
+                                const data2 = await res2.json();
+                                availableBranches.value = data2.branches;
+                            }
+                            
+                            alert(`Loaded config from ${path}`);
+                        } else {
+                            alert("Failed to load config.");
+                        }
+                    } catch(e) {
+                        alert("Error loading config: " + e.message);
+                    }
+                };
+
+                const updateRuntimeVars = async () => {
+                    // Deprecated or can be aliased to saveConfig if we want auto-save
+                    // For now, we rely on manual Save Configuration for persistence
+                };
+
+                // Large Editor
+                const editorState = ref({ key: '', value: '' });
+                let editorModalInstance = null;
+                
+                const openEditor = (key, value) => {
+                    editorState.value = { key, value };
+                    if(!editorModalInstance) editorModalInstance = new bootstrap.Modal(document.getElementById('largeEditorModal'));
+                    editorModalInstance.show();
+                };
+                
+                const saveEditor = () => {
+                    if (editorState.value.key && config.value.global_vars) {
+                        config.value.global_vars[editorState.value.key] = editorState.value.value;
+                    }
+                    editorModalInstance.hide();
+                };
+
+                const startAgent = async () => {
+                    const res = await fetch('/api/start', { 
+                        method: 'POST', headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify(config.value) 
+                    });
+                    if(res.ok) isRunning.value = true;
+                };
+                const stopAgent = async (type = 'force') => {
+                    await fetch(`/api/stop?type=${type}`, {method: 'POST'});
+                };
+                const updateTaskRoot = async () => {
+                    await fetch('/api/set_root', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path: taskRoot.value})});
+                };
+                const saveWorkflow = () => {
+                     alert("Workflow saved to memory for current session.");
+                };
+                
+                // --- CHAT LOGIC ---
+                const sendChatMessage = async () => {
+                    if (!chatInput.value.trim()) return;
+                    const msg = chatInput.value;
+                    chatMessages.value.push({ role: 'user', content: msg });
+                    chatInput.value = '';
+                    isChatting.value = true;
+                    scrollToBottom();
+                    
+                    try {
+                        const res = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                message: msg,
+                                session_id: chatSessionId.value,
+                                model: chatModel.value
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.error) {
+                            chatMessages.value.push({ role: 'assistant', content: `Error: ${data.error}` });
+                        } else {
+                            chatMessages.value.push({ role: 'assistant', content: data.response });
+                            chatSessionId.value = data.session_id;
+                        }
+                    } catch (e) {
+                        chatMessages.value.push({ role: 'assistant', content: `Network Error: ${e.message}` });
+                    } finally {
+                        isChatting.value = false;
+                        scrollToBottom();
+                    }
+                };
+
+                const resetChatSession = () => {
+                    chatSessionId.value = null;
+                    chatMessages.value = [{role: 'assistant', content: 'Session reset. Ready for new instructions.'}];
+                };
+
+                const scrollToBottom = () => {
+                    nextTick(() => {
+                        if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+                    });
+                };
+
+                const renderViz = async () => {
+                     try {
+                         const res = await fetch('/api/scan_progress');
+                         if (!res.ok) return;
+                         const data = await res.json();
+                         const nodes = data.nodes;
+                         const edges = data.edges;
+                         const branchInfo = data.branch_info || {}; // Fix: Define branchInfo
+                         
+                         // Capture state for search
+                         vizNodesData = nodes;
+                         vizWidth = document.getElementById("viz-canvas").clientWidth;
+                         vizHeight = document.getElementById("viz-canvas").clientHeight;
+
+                         // Clear canvas
+                         d3.select("#viz-canvas").selectAll("*").remove();
+                         
+                         vizZoom = d3.zoom()
+                             .on("zoom", (e) => g.attr("transform", e.transform));
+
+                         vizSvg = d3.select("#viz-canvas").append("svg")
+                             .attr("width", vizWidth)
+                             .attr("height", vizHeight)
+                             .call(vizZoom)
+                             .on("dblclick.zoom", null);
+                             
+                         const g = vizSvg.append("g");
+                         
+                         // ... (rest of layout code) ...
+                         
+                         const branches = [...new Set(nodes.map(n => n.branch))].sort();
+                         const branchY = {};
+                         branches.forEach((b, i) => branchY[b] = (i + 1) * 200); // Increased spacing for boxes
+                         
+                         const simulation = d3.forceSimulation(nodes)
+                             .force("link", d3.forceLink(edges).id(d => d.id).distance(150))
+                             .force("charge", d3.forceManyBody().strength(-1000))
+                             .force("center", d3.forceCenter(vizWidth / 2, vizHeight / 2))
+                             .force("x", d3.forceX(vizWidth / 2).strength(0.05))
+                             .force("y", d3.forceY(d => branchY[d.branch] || vizHeight/2).strength(0.8)); // Stronger Y force
+                             
+                         // Branch Groups (Background)
+                         const branchG = g.append("g").attr("class", "branch-group");
+                         
+                         // Create Branch Boxes
+                         const branchBoxes = branchG.selectAll("g")
+                             .data(branches)
+                             .enter().append("g")
+                             .attr("class", "branch-box")
+                             .style("display", showBranchBoxes.value ? "block" : "none");
+                             
+                         branchBoxes.append("rect")
+                             .attr("fill", "none")
+                             .attr("stroke", "#555")
+                             .attr("stroke-dasharray", "5,5")
+                             .attr("rx", 10);
+                             
+                         branchBoxes.append("text")
+                             .attr("fill", "#aaa")
+                             .style("font-size", "14px")
+                             .style("font-weight", "bold")
+                             .text(b => {
+                                 const customName = branchInfo[b];
+                                 return customName ? `${b} (${customName})` : b;
+                             });
+
+                         const link = g.append("g")
+                             .selectAll("line")
+                             .data(edges)
+                             .enter().append("line")
+                             .attr("class", "viz-link");
+                             
+                         const node = g.append("g")
+                             .selectAll("g")
+                             .data(nodes)
+                             .enter().append("g")
+                             .attr("class", "viz-node")
+                             .on("click", (e, d) => {
+                                 // Single click always opens sidebar
+                                 selectedVizNode.value = d;
+                                 showVizSide.value = true;
+                             })
+                             .call(d3.drag()
+                                 .filter(event => event.detail === 2) // Only start drag on double-click-hold
+                                 .on("start", dragstarted)
+                                 .on("drag", dragged)
+                                 .on("end", dragended));
+                                 
+                         // ... (append rect/text same) ...
+                         node.append("rect")
+                             .attr("width", 140)
+                             .attr("height", 60)
+                             .attr("x", -70)
+                             .attr("y", -30)
+                             .attr("fill", d => d.is_improved ? "#d4edda" : "#f8d7da") 
+                             .attr("stroke", d => d.is_improved ? "#28a745" : "#dc3545");
+                             
+                         node.append("text")
+                             .attr("dy", "-0.5em")
+                             .attr("text-anchor", "middle")
+                             .style("font-weight", "bold")
+                             .text(d => d.name);
+                             
+                         node.append("text")
+                             .attr("dy", "1.2em")
+                             .attr("text-anchor", "middle")
+                             .style("font-size", "10px")
+                             .text(d => d.metrics.length > 20 ? d.metrics.substring(0,18)+"..." : d.metrics);
+
+                         simulation.on("tick", () => {
+                             link
+                                 .attr("x1", d => d.source.x)
+                                 .attr("y1", d => d.source.y)
+                                 .attr("x2", d => d.target.x)
+                                 .attr("y2", d => d.target.y);
+                                 
+                             node.attr("transform", d => `translate(${d.x},${d.y})`);
+                             
+                             // Update Branch Boxes
+                             if (showBranchBoxes.value) {
+                                 branchBoxes.each(function(b) {
+                                     const branchNodes = nodes.filter(n => n.branch === b);
+                                     if (branchNodes.length === 0) return;
+                                     
+                                     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                                     branchNodes.forEach(n => {
+                                         if (n.x < minX) minX = n.x;
+                                         if (n.x > maxX) maxX = n.x;
+                                         if (n.y < minY) minY = n.y;
+                                         if (n.y > maxY) maxY = n.y;
+                                     });
+                                     
+                                     const padding = 40;
+                                     const box = d3.select(this);
+                                     box.select("rect")
+                                         .attr("x", minX - padding)
+                                         .attr("y", minY - padding)
+                                         .attr("width", (maxX - minX) + padding * 2)
+                                         .attr("height", (maxY - minY) + padding * 2);
+                                         
+                                     box.select("text")
+                                         .attr("x", minX - padding)
+                                         .attr("y", minY - padding - 10);
+                                 });
+                             }
+                         });
+                         
+                         function dragstarted(event, d) {
+                             if (!event.active) simulation.alphaTarget(0.3).restart();
+                             d.fx = d.x;
+                             d.fy = d.y;
+                         }
+                         function dragged(event, d) {
+                             d.fx = event.x;
+                             d.fy = event.y;
+                         }
+                         function dragended(event, d) {
+                             if (!event.active) simulation.alphaTarget(0);
+                             d.fx = null;
+                             d.fy = null;
+                         }
+                         
+                     } catch(e) { console.error(e); }
+                };
+
+                const openFileInExplorer = async (node) => {
+                    currentTab.value = 'explorer';
+                    currentRelPath.value = node.id; 
+                    rootDir.value = "..." + node.id; 
+                    await loadFiles();
+                };
+                
+                const showItemDetail = (key, val) => {
+                    let content = val;
+                    if (typeof val === 'object' && val !== null) {
+                        content = JSON.stringify(val, null, 2);
+                    }
+                    previewFile.value = { name: key, content: content };
+                    fileModal.show();
+                };
+                
+                const searchVizNode = () => {
+                    if (!searchQuery.value || !vizNodesData.length) return;
+                    const query = searchQuery.value.toLowerCase();
+                    const target = vizNodesData.find(n => n.name.toLowerCase().includes(query));
+                    
+                    if (target) {
+                        // Select and Show Sidebar
+                        selectedVizNode.value = target;
+                        showVizSide.value = true;
+                        
+                        // Center View using D3 Zoom
+                        if (vizSvg && vizZoom) {
+                            // Calculate transform to center on (target.x, target.y)
+                            // Translate to center, then inverse translate node pos
+                            const scale = 1.5; // Zoom in a bit
+                            const x = -target.x * scale + vizWidth / 2;
+                            const y = -target.y * scale + vizHeight / 2;
+                            
+                            vizSvg.transition().duration(750).call(
+                                vizZoom.transform, 
+                                d3.zoomIdentity.translate(x, y).scale(scale)
+                            );
+                        }
+                    } else {
+                        alert("Node not found");
+                    }
+                };
+
+                socket.on('log', (msg) => {
+                    msg.time = new Date().toLocaleTimeString();
+                    logs.value.push(msg);
+                });
+                socket.on('status', (msg) => { if(msg.data==='stopped') isRunning.value = false; });
+
+                // Tour Logic
+                
+                const startTour = (tab) => {
+                    // Check if the library is loaded under window.driver.js.driver
+                    if (!window.driver || !window.driver.js || !window.driver.js.driver) {
+                        alert("Tour library not loaded properly. Please check console.");
+                        console.error("Driver.js state:", window.driver);
+                        return;
+                    }
+                    
+                    try {
+                        let steps = [];
+                        if (tab === 'control') {
+                            steps = [
+                                { popover: { title: 'Control Panel', description: 'Configure and run your agent task here.' } },
+                                { element: '#tour-cp-root', popover: { title: 'Task Root', description: 'Set the working directory for the agent. Note: The path like `Task Root/Branch_example/exp_example/` should exist to serve as a seed for evolution.' } },
+                                { element: '#tour-cp-mode', popover: { title: 'Execution Mode', description: 'Start a new branch or resume an existing one. Configure cycles here.' } },
+                                { element: '#tour-cp-vars-container', popover: { title: 'Variables', description: 'Define global variables and changeable parameters. You can Add/Remove/Rename global variables dynamically. These act as inputs to the Agent\'s prompts or environment.' } },
+                                { element: '#tour-cp-actions', popover: { title: 'Configuration Actions', description: 'Here you can manage your configuration files:<br><ul><li><b>Save Config</b>: Saves current settings to `config.json` (active config).</li><li><b>Save As...</b>: Saves current settings to a specified file AND makes it the new active config.</li><li><b>Load...</b>: Loads settings from a specified file AND makes it the new active config.</li><li><b>Start/Stop Agent</b>: Controls the agent\'s execution.</li></ul>' } },
+                                { element: '#console', popover: { title: 'Console Logs', description: 'Live output logs from the agent process.' } }
+                            ];
+                        } else if (tab === 'explorer') {
+                            steps = [
+                                { element: '#tour-fe-nav', popover: { title: 'Navigation', description: 'Navigate directories, create new files, or refresh the view.' } },
+                                { element: '#tour-fe-list', popover: { title: 'File List', description: 'Browse files. Use the buttons on each item to Copy, Rename, or Delete.' } }
+                            ];
+                        } else if (tab === 'workflow') {
+                            steps = [
+                                { popover: { title: 'Workflow Editor', description: 'Design your agent\'s execution flow here.' } },
+                                { element: '#tour-wf-palette', popover: { title: 'Node Palette', description: 'Drag and drop components from here onto the canvas to build your workflow.' } },
+                                { element: '#tour-wf-actions', popover: { title: 'Template Actions', description: 'Load example workflows: "Reset Seq" for a standard sequential loop, or "Reset Par" for a parallel execution example (Parallel is currently experimental). You can also refresh or save your work here.' } },
+                                { element: '.graph-canvas', popover: { title: 'Canvas', description: 'This is where you arrange and connect your nodes. Drag to pan, scroll to zoom, click to select, and double-click a subloop node to edit its inner graph.' } },
+                                { element: '.node-properties', popover: { title: 'Node Properties', description: 'Select a node on the canvas to edit its specific configurations here. For large text fields (like Python code or prompt templates), double-click the textarea to open a larger editor.' } },
+                                { element: '.ai-toggle-btn', popover: { title: 'AI Assistant', description: 'Chat with Gemini to help modify or understand your workflow, or generate code snippets.' } },
+                                { element: '#tour-wf-refresh', popover: { title: 'Refresh from Cache', description: 'If Gemini modifies the workflow via chat, click this button to refresh the canvas and see the changes applied.' } },
+                                { element: '#tour-wf-save', popover: { title: 'Save to Cache', description: 'Click here to save your current workflow layout and node configurations to the local cache. This makes your changes persistent for future sessions.' } }
+                            ];
+                        }
+
+                        const driver = window.driver.js.driver({
+                            showProgress: true,
+                            steps: steps, // Pass steps here
+                            onDestroyed: () => {
+                                // Optional cleanup
+                            }
+                        });
+                        
+                        driver.drive();
+                    } catch (e) {
+                        console.error("Tour Error:", e);
+                        alert("Failed to start tour: " + e.message);
+                    }
+                };
+
+                return {
+                    currentTab, isRunning, logs, config, taskRoot, explorerRoot, fileList, availableBranches,
+                    graphStack, currentGraph, pan, zoom, selectedNode, selectedEdge, dragEdge,
+                    loadWorkflowFromCache, navToLevel, nodeDblClick,
+                    dragStart, onDrop, onMouseDown, onMouseMove, onMouseUp, 
+                    nodeMouseDown, portMouseDown, portMouseUp, deleteNode, duplicateNode, deleteEdge, selectEdge,
+                    getEdgePath, getTempEdgePath, getEdgeLabelPos,
+                    updateChangeableVars, updateRuntimeVars, startAgent, stopAgent, updateTaskRoot, saveWorkflow,
+                    onFileClick, goUpDir, deleteItem, createNewFile, copyItem, renameItem, previewFile, renderViz,
+                    editorState, openEditor, saveEditor,
+                    showVizSide, selectedVizNode, openFileInExplorer, 
+                    searchQuery, searchVizNode, showItemDetail,
+                    saveFile, saveStatus, showBranchBoxes, expandText, loadFiles,
+                    chatMessages, chatInput, isChatting, chatModel, sendChatMessage, resetChatSession, chatMinimized, chatContainer,
+                    refreshWorkflow, apiAction, saveAsWorkflow, loadFromPath, startTour,
+                    addGlobalVar, removeGlobalVar, renameGlobalVar, saveConfig, saveConfigAs, loadConfigFrom // Export new functions
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

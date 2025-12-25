@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Commander</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', monospace; }
+        .console-box {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            height: 600px;
+            overflow-y: auto;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+        .log-entry { margin-bottom: 2px; }
+        .log-error { color: #ff6b6b; }
+        .sidebar { height: 100vh; overflow-y: auto; border-right: 1px solid #444; }
+        .tree-node { cursor: pointer; }
+        .tree-node:hover { color: #61dafb; }
+        .branch-badge { font-size: 0.8em; margin-left: 5px; }
+    </style>
+</head>
+<body>
+    {% raw %}
+    <div id="app" class="container-fluid">
+        <div class="row">
+            <!-- Sidebar / Tabs -->
+            <div class="col-md-2 bg-dark sidebar p-3">
+                <h4 class="mb-4 text-primary">Agent Commander</h4>
+                <div class="nav flex-column nav-pills">
+                    <button class="nav-link" :class="{active: currentTab==='explorer'}" @click="currentTab='explorer'">📁 File Explorer</button>
+                    <button class="nav-link" :class="{active: currentTab==='control'}" @click="currentTab='control'">🤖 Agent Control</button>
+                    <button class="nav-link" :class="{active: currentTab==='workflow'}" @click="currentTab='workflow'">⚙️ Workflow/Prompts</button>
+                </div>
+                <hr>
+                <div class="mt-auto">
+                    <small class="text-muted">Status:</small><br>
+                    <span :class="{'text-success': isRunning, 'text-secondary': !isRunning}">
+                        {{ isRunning ? '● Running' : '○ Idle' }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 p-4">
+                
+                <!-- Tab 1: File Explorer -->
+                <div v-if="currentTab === 'explorer'">
+                    <div class="input-group mb-3">
+                        <span class="input-group-text">Root Dir</span>
+                        <input type="text" class="form-control" v-model="rootDir" @keyup.enter="changeRoot">
+                        <button class="btn btn-outline-secondary" @click="changeRoot">Refresh/Scan</button>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4" style="max-height: 80vh; overflow-y: auto;">
+                            <div v-if="fileTree.children">
+                                <file-tree-item :model="fileTree" @select-file="loadFile"></file-tree-item>
+                            </div>
+                            <div v-else>Loading or Empty...</div>
+                        </div>
+                        <div class="col-md-8">
+                            <div v-if="selectedFileContent" class="card bg-dark text-light">
+                                <div class="card-header">{{ selectedFilePath }}</div>
+                                <div class="card-body">
+                                    <!-- Basic Image Support -->
+                                    <img v-if="isImage(selectedFilePath)" :src="selectedFileContent" class="img-fluid">
+                                    <pre v-else style="max-height: 70vh; overflow: auto;">{{ selectedFileContent }}</pre>
+                                </div>
+                            </div>
+                            <div v-else class="alert alert-secondary">Select a file to view.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Agent Control -->
+                <div v-if="currentTab === 'control'">
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <div class="card p-3 mb-3">
+                                <h5>Control Panel</h5>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label>Mode</label>
+                                        <select class="form-select" v-model="config.mode">
+                                            <option value="new">Start New Branch</option>
+                                            <option value="resume">Resume Branch</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4" v-if="config.mode === 'resume'">
+                                        <label>Branch</label>
+                                        <select class="form-select" v-model="config.resume_branch_id">
+                                            <option v-for="b in availableBranches" :value="b.replace('Branch', '')">{{ b }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label>Cycles</label>
+                                        <input type="number" class="form-control" v-model.number="config.n_cycles">
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <h6>Global Variables (Recursive)</h6>
+                                    <div v-for="(val, key) in config.global_vars" :key="key" class="input-group mb-2">
+                                        <span class="input-group-text font-monospace">{{ '{' + key + '}' }}</span>
+                                        <textarea class="form-control" v-model="config.global_vars[key]" rows="1"></textarea>
+                                        <button class="btn btn-outline-danger" @click="delete config.global_vars[key]">X</button>
+                                    </div>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" placeholder="NEW_VAR_NAME" id="newVarKey">
+                                        <button class="btn btn-outline-secondary" @click="addGlobalVar()">+ Add Var</button>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <h6>LLM Changeable Variables (Whitelist)</h6>
+                                    <small class="text-muted d-block mb-2">Only these keys in history.json can be modified by the LLM.</small>
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">Keys</span>
+                                        <input type="text" class="form-control" :value="config.llm_changeable_vars.join(', ')" @input="updateChangeableVars">
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <div v-if="!isRunning">
+                                        <button class="btn btn-primary w-100" @click="startAgent">
+                                            ▶ Start Agent Loop
+                                        </button>
+                                    </div>
+                                    <div v-else class="row g-2">
+                                        <div class="col-6">
+                                            <button class="btn btn-warning w-100" @click="stopAgentGracefully">
+                                                🛑 Stop (After Cycle)
+                                            </button>
+                                        </div>
+                                        <div class="col-6">
+                                            <button class="btn btn-danger w-100" @click="stopAgent">
+                                                ☠️ Kill (Immediate)
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="console-box" id="console">
+                        <div v-for="(log, i) in logs" :key="i" class="log-entry" :class="{'log-error': log.type === 'error'}">
+                            <span class="text-muted">[{{ log.time }}]</span> {{ log.data }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Workflow Editor -->
+                <div v-if="currentTab === 'workflow'">
+                    <div class="row mb-3">
+                        <div class="col-12 d-flex align-items-center">
+                            <button class="btn btn-outline-primary me-2" @click="loadDefaultWorkflow">Load Default</button>
+                            
+                            <div class="input-group me-2" style="width: 400px;">
+                                <span class="input-group-text">Path</span>
+                                <input type="text" class="form-control" v-model="workflowPath" placeholder="e.g. workflows/my_flow.json">
+                                <button class="btn btn-outline-secondary" @click="loadWorkflowFromPath">Load</button>
+                            </div>
+
+                            <button class="btn btn-primary ms-auto" @click="saveWorkflow">Save Workflow</button>
+                        </div>
+                    </div>
+                    <div class="row" style="height: 75vh;">
+                        <!-- Palette -->
+                        <div class="col-md-3 border-end">
+                            <h6>Step Palette</h6>
+                            <div class="list-group">
+                                <button class="list-group-item list-group-item-action" v-for="step in availableSteps" :key="step.type" @click="addStep(step)">
+                                    + {{ step.label }}
+                                </button>
+                            </div>
+                            
+                            <div class="mt-4 p-2 bg-secondary rounded" style="font-size: 0.8rem;">
+                                <h6>Global Variables</h6>
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>{cwd}</code>: Workspace Path</li>
+                                    <li><code>{cycle}</code> / <code>{total_cycles}</code></li>
+                                    <li><code>{hypothesis}</code>: Hypothesis</li>
+                                    <li><code>{exp_design}</code>: Design</li>
+                                    <li><code>{result_analysis}</code>: Analysis</li>
+                                    <li><code>{lessons_text}</code>: Failures</li>
+                                    <li><code>{last_response}</code>: Prev Output</li>
+                                    <li><code>{current_exp_folder}</code>: Abs Path</li>
+                                    <li><code>{B}</code>, <code>{L}</code>, <code>{S}</code>: Indices</li>
+                                    <li><code>{condition}</code>: State</li>
+                                    <hr class="my-1 border-secondary">
+                                    <li v-for="(val, key) in config.global_vars" :key="key" class="text-info">
+                                        <code>{{ '{' + key + '}' }}</code>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Workflow List -->
+                        <div class="col-md-4 border-end" style="overflow-y: auto;">
+                            <h6>Subloop Steps (Inside Loop)</h6>
+                            <div v-if="config.workflow.length === 0" class="text-muted fst-italic p-2">No steps. Add from palette.</div>
+                            <div class="card mb-2" v-for="(step, idx) in config.workflow" :key="idx" 
+                                 :class="{'border-primary': selectedStep === step}" @click="selectedStep = step">
+                                <div class="card-body p-2 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ idx + 1 }}. {{ step.name }}</strong><br>
+                                        <small class="text-muted">{{ step.type }}</small>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-secondary" @click.stop="moveStep(idx, -1)" :disabled="idx===0">↑</button>
+                                        <button class="btn btn-sm btn-outline-secondary" @click.stop="moveStep(idx, 1)" :disabled="idx===config.workflow.length-1">↓</button>
+                                        <button class="btn btn-sm btn-outline-info ms-1" @click.stop="duplicateStep(idx)">📑</button>
+                                        <button class="btn btn-sm btn-outline-danger ms-1" @click.stop="removeStep(idx)">×</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Config Editor -->
+                        <div class="col-md-5" style="overflow-y: auto;">
+                            <h6>Step Configuration</h6>
+                            <div v-if="selectedStep">
+                                <div class="mb-2">
+                                    <label>Name</label>
+                                    <input type="text" class="form-control" v-model="selectedStep.name">
+                                </div>
+                                <div class="mb-2">
+                                    <label>Description</label>
+                                    <textarea class="form-control" v-model="selectedStep.description" rows="2"></textarea>
+                                </div>
+                                
+                                <!-- Variables Display -->
+                                <div class="mb-3">
+                                    <small class="fw-bold">Input Vars:</small>
+                                    <div v-if="selectedStep.config.input_vars && selectedStep.config.input_vars.length">
+                                        <span v-for="v in selectedStep.config.input_vars" class="badge bg-secondary me-1">{{ v }}</span>
+                                    </div>
+                                    <div v-else class="text-muted small">None</div>
+                                    
+                                    <small class="fw-bold mt-1 d-block">Output Vars:</small>
+                                    <div v-if="selectedStep.config.output_vars && selectedStep.config.output_vars.length">
+                                        <span v-for="v in selectedStep.config.output_vars" class="badge bg-success me-1">{{ v }}</span>
+                                    </div>
+                                    <div v-else class="text-muted small">None</div>
+                                </div>
+                                
+                                <hr>
+                                <h6>Parameters</h6>
+                                
+                                <!-- Init Config -->
+                                <div v-if="selectedStep.type === 'system_init'">
+                                    <div class="alert alert-secondary p-2" style="font-size: 0.85em;">
+                                        <strong>Available Variables for Code:</strong><br>
+                                        <code>current_exp_folder</code>: Absolute path to workspace.<br>
+                                        <code>B</code>, <code>L</code>, <code>S</code>: Branch, Layer, Sub indices.<br>
+                                        <code>condition</code>: 'new_branch', 'from_improved', 'from_fail'.
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <label>Initialization Code (Python)</label>
+                                        
+                                        <!-- Condition Tabs -->
+                                        <div class="btn-group w-100 mb-2" role="group">
+                                            <button type="button" class="btn btn-sm" 
+                                                :class="selectedCondition === 'new_branch' ? 'btn-primary' : 'btn-outline-secondary'"
+                                                @click="selectedCondition = 'new_branch'">New Branch</button>
+                                            <button type="button" class="btn btn-sm" 
+                                                :class="selectedCondition === 'from_improved' ? 'btn-primary' : 'btn-outline-secondary'"
+                                                @click="selectedCondition = 'from_improved'">From Improved</button>
+                                            <button type="button" class="btn btn-sm" 
+                                                :class="selectedCondition === 'from_fail' ? 'btn-primary' : 'btn-outline-secondary'"
+                                                @click="selectedCondition = 'from_fail'">From Fail</button>
+                                        </div>
+
+                                        <div v-if="selectedStep.config.code_map">
+                                            <textarea class="form-control bg-dark text-light font-monospace" rows="6" 
+                                                v-model="selectedStep.config.code_map[selectedCondition]" 
+                                                :placeholder="'Code for ' + selectedCondition"></textarea>
+                                        </div>
+                                        <div v-else class="alert alert-warning p-1">
+                                            Legacy config detected. Please re-add this step to upgrade.
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <button class="btn btn-sm btn-outline-info" @click="printInitVars">🖨️ Print Dir Variables to Console</button>
+                                    </div>
+                                </div>
+                                
+                                <!-- LLM Config -->
+                                <div v-if="selectedStep.type === 'llm_generate'">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <label>Model</label>
+                                            <select class="form-select" v-model="selectedStep.config.model">
+                                                <option value="auto">Auto</option>
+                                                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
+                                                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
+                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash</option>
+                                                <option value="gemini-1.5-flash-8b-latest">Gemini 1.5 Flash 8B</option>
+                                                <option value="claude-cli">Claude CLI (Local)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <label>Timeout (s)</label>
+                                            <input type="number" class="form-control" v-model.number="selectedStep.config.timeout">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <label>Prompt Template</label>
+                                        <textarea class="form-control font-monospace" rows="6" v-model="selectedStep.config.user_template"></textarea>
+                                    </div>
+                                    <div class="mb-2">
+                                        <button class="btn btn-sm btn-outline-info w-100" @click="previewPrompt(selectedStep)">👁️ Preview Final Prompt</button>
+                                        <textarea v-if="previewText" class="form-control mt-2 bg-dark text-info" rows="6" readonly>{{ previewText }}</textarea>
+                                    </div>
+                                </div>
+                                
+                                <!-- Shell Config -->
+                                <div v-if="selectedStep.type === 'run_shell'">
+                                    <div class="mb-2">
+                                        <label>Command</label>
+                                        <input type="text" class="form-control bg-dark text-light font-monospace" v-model="selectedStep.config.command">
+                                        <small class="text-muted">Supports {venv} placeholder</small>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label>Timeout (s)</label>
+                                        <input type="number" class="form-control" v-model.number="selectedStep.config.timeout">
+                                    </div>
+                                </div>
+
+                                <!-- Write History Config -->
+                                <div v-if="selectedStep.type === 'write_history'">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <label>Target Key</label>
+                                            <input type="text" class="form-control" v-model="selectedStep.config.key" placeholder="e.g. chat_log">
+                                        </div>
+                                        <div class="col-6">
+                                            <label>Mode</label>
+                                            <select class="form-select" v-model="selectedStep.config.mode">
+                                                <option value="append">Append (List)</option>
+                                                <option value="overwrite">Overwrite</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label>Value Type</label>
+                                        <select class="form-select" v-model="selectedStep.config.value_type">
+                                            <option value="string">String</option>
+                                            <option value="json">JSON / Dict</option>
+                                            <option value="boolean">Boolean</option>
+                                            <option value="number">Number</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label>Value Template</label>
+                                        <textarea class="form-control font-monospace" rows="4" v-model="selectedStep.config.value_template" placeholder="Value to write. Supports {vars}."></textarea>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div v-else class="text-muted p-3">Select a step to edit its configuration.</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    {% endraw %}
+
+    {% raw %}
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+        const socket = io();
+
+        // Recursive File Tree Component
+        const FileTreeItem = {
+            name: 'FileTreeItem',
+            props: ['model'],
+            emits: ['select-file'],
+            template: `
+                <div class="ms-3">
+                    <div class="tree-node" @click="toggle" :class="{'text-warning': isFolder}">
+                        <span v-if="isFolder">{{ isOpen ? '📂' : '📁' }} {{ model.name }}</span>
+                        <span v-else @click.stop="$emit('select-file', model.path)">📄 {{ model.name }}</span>
+                    </div>
+                    <div v-show="isOpen && isFolder">
+                        <file-tree-item
+                            v-for="child in model.children"
+                            :key="child.path"
+                            :model="child"
+                            @select-file="$emit('select-file', $event)">
+                        </file-tree-item>
+                    </div>
+                </div>
+            `,
+            data() {
+                return { isOpen: false };
+            },
+            computed: {
+                isFolder() { return this.model.type === 'folder'; }
+            },
+            methods: {
+                toggle() { if (this.isFolder) this.isOpen = !this.isOpen; }
+            }
+        };
+
+        createApp({
+            components: { FileTreeItem },
+            setup() {
+                const currentTab = ref('control');
+                const rootDir = ref('');
+                const fileTree = ref({});
+                const selectedFileContent = ref('');
+                const selectedFilePath = ref('');
+                const isRunning = ref(false);
+                const logs = ref([]);
+                const availableBranches = ref([]);
+                                const selectedStep = ref(null);
+                                const workflowPath = ref('');
+                                const previewText = ref('');
+                                const selectedCondition = ref('new_branch');
+                                
+                                                const availableSteps = [
+                                                                        { 
+                                                                            type: 'llm_generate', label: 'LLM Generation', 
+                                                                            config: { 
+                                                                                timeout: 600, 
+                                                                                model: 'claude-cli',
+                                                                                user_template: '{DEFAULT_SYS}\\n\\n[CRITICAL SAFETY WARNING]\\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory.\\n\\nCurrent Working Directory: {cwd}\\nCycle: {cycle}/{total_cycles}\\nPrevious Hypothesis: {hypothesis}\\nPrevious Experiment Design: {exp_design}\\nPrevious Results: {result_analysis}\\nImproved from Parent: {if_improved}\\n{lessons_text}\\n\\nTask:\\nAnalyze the previous research context. Plan the next experiment to improve the strategy.\\n\\nInstructions:\\n1. Modify strategy code (*.py). You are encouraged to add/remove print statements for intermediate variables to clarify the research process.\\n2. You can ARBITRARILY MODIFY `aiagent_run.sh` to add parameter searches, extra research scripts, or verification tasks.\\n3. Do NOT run the script yourself. The workflow will run `bash aiagent_run.sh` automatically.\\n4. Ensure `best_param.env` is generated with STRICT format: `KEY=VALUE` (no spaces around =, no commas, one per line). INVALID: `K = V`, `K=V,`, `K=\'V\'`.',
+                                                                                input_vars: ['cwd', 'cycle', 'hypothesis', 'exp_design', 'result_analysis', 'if_improved', 'lessons_text'],
+                                                                                output_vars: ['last_response', 'subloopinfo_llm']
+                                                                            } 
+                                                                        },                                                    { 
+                                                        type: 'run_shell', label: 'Run Command', 
+                                                        config: { 
+                                                            command: 'echo hello', timeout: 600,
+                                                            input_vars: [], output_vars: []
+                                                        } 
+                                                    },
+                                                    { 
+                                                        type: 'run_shell', label: 'Run Evaluator (Preset)', name: 'Run Evaluator',
+                                                        config: { 
+                                                            command: "export PYTHONPATH=$PYTHONPATH:../../ && {venv} -c \"import os; [os.environ.update({line.split('=', 1)[0].strip(): line.split('=', 1)[1].strip()}) for line in open('best_param.env') if '=' in line and not line.strip().startswith('#')]; from evaluator import evaluate; print(evaluate('strategy.py'))\"", 
+                                                            timeout: 120,
+                                                            input_vars: ['best_param.env', 'strategy.py'], output_vars: ['current_metric']
+                                                        } 
+                                                    },
+                                                    { 
+                                                        type: 'write_history', label: 'Save Metric (Preset)', name: 'Save Metric',
+                                                        config: { 
+                                                            key: 'metrics', mode: 'overwrite', value_type: 'json',
+                                                            value_template: '{"score": {current_metric}}', 
+                                                            input_vars: ['current_metric'], output_vars: ['history.json'] 
+                                                        } 
+                                                    },
+                                                    { 
+                                                        type: 'write_history', label: 'Save Improvement', name: 'Save Improvement',
+                                                        config: { 
+                                                            key: 'if_improved', mode: 'overwrite', value_type: 'boolean',
+                                                            value_template: '{is_improved}',
+                                                            input_vars: ['is_improved'], output_vars: ['history.json'] 
+                                                        } 
+                                                    },
+                                                    { 
+                                                        type: 'write_history', label: 'Append Chat Log', name: 'Log Chat',
+                                                        config: { 
+                                                            key: 'chat_log', mode: 'append', value_type: 'string',
+                                                            value_template: 'PROMPT:\\n{last_prompt}\\n\\nRESPONSE:\\n{last_response}',
+                                                            input_vars: ['last_prompt', 'last_response'], output_vars: ['history.json'] 
+                                                        } 
+                                                    },
+                                                    { 
+                                                        type: 'write_history', label: 'Save Analysis', name: 'Save Analysis',
+                                                        config: { 
+                                                            key: 'ROOT', mode: 'update', value_type: 'json',
+                                                            value_template: '{analysis_result}',
+                                                            input_vars: ['analysis_result'], output_vars: ['history.json'] 
+                                                        } 
+                                                    },
+                                                    { 
+                                                        type: 'llm_generate', label: 'Analyze Results', name: 'Analyze Results',
+                                                        config: { 
+                                                            model: 'claude-cli', timeout: 600,
+                                                            user_template: 'Execution Logs (./stdout.txt , ./stderr.txt):\\n{execution_log}\\n\\n[CRITICAL SAFETY WARNING]\\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory.\\n\\nTask:\\n1. Analyze the logs.\\n2. Formulate \'hypothesis\', \'exp_design\', \'result_analysis\' (Do NOT modify other JSON keys).\\n3. DIRECTLY UPDATE `history.json` using tools (e.g. write_file) or python script.\\n   STRICT SCHEMA for history.json:\\n   - gemini_session_id, claude_session_id (Preserve these!)\\n   - hypothesis, parent_exp, exp_design, if_improved, metrics, result_analysis\\n   - NO other keys.',
+                                                            input_vars: ['execution_log'], output_vars: ['last_response']
+                                                        } 
+                                                    },
+                                                    { 
+                                                        type: 'check_improvement', label: 'Check Improvement', 
+                                                        config: { input_vars: ['current_metric', 'parent_metric'], output_vars: ['is_improved'] } 
+                                                    }
+                                                ];
+                const config = ref({
+                    mode: 'new',
+                    resume_branch_id: '',
+                    n_cycles: 1,
+                    workflow: [],
+                    llm_changeable_vars: ['hypothesis', 'exp_design', 'result_analysis'],
+                    global_vars: {
+                        "venv": "/home/liumx/.conda/envs/lean/bin/python",
+                        "DEFAULT_SYS": "[SYSTEM: You are an autonomous AI agent.] Strictly maintain history.json schema: gemini_session_id, claude_session_id, hypothesis, parent_exp, exp_design, if_improved, metrics, result_analysis. NOTE: ../../evaluator.py is IMMUTABLE. You must use it as is to ensure fair comparison. Do not modify it."
+                    }
+                });
+
+                // Recursive formatter
+                const formatString = (template, vars) => {
+                    let result = template;
+                    let maxDepth = 10;
+                    while (maxDepth-- > 0) {
+                        let modified = false;
+                        result = result.replace(/\{(\w+)\}/g, (match, key) => {
+                            if (key in vars) {
+                                modified = true;
+                                return vars[key];
+                            }
+                            return match;
+                        });
+                        if (!modified) break;
+                    }
+                    return result;
+                };
+                
+                // ... existing methods ...
+
+                // Initial Load
+                onMounted(async () => {
+                    const res = await fetch('/api/config');
+                    const data = await res.json();
+                    rootDir.value = data.root_dir;
+                    availableBranches.value = data.branches;
+                    loadFiles();
+                    loadDefaultWorkflow();
+                });
+
+                // Methods
+                const loadFiles = async () => {
+                    const res = await fetch('/api/files');
+                    if(res.ok) fileTree.value = await res.json();
+                };
+
+                const changeRoot = async () => {
+                    const res = await fetch('/api/set_root', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({path: rootDir.value})
+                    });
+                    if(res.ok) {
+                        const data = await res.json();
+                        availableBranches.value = data.branches;
+                        loadFiles();
+                    } else {
+                        alert('Invalid Path');
+                    }
+                };
+
+                const isImage = (path) => {
+                    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(path);
+                };
+
+                const loadFile = async (path) => {
+                    selectedFilePath.value = path;
+                    selectedFileContent.value = "Loading...";
+                    const res = await fetch(`/api/file_content?path=${encodeURIComponent(path)}`);
+                    if(res.ok) {
+                        const data = await res.json();
+                        if (isImage(path)) {
+                            selectedFileContent.value = `data:image;base64,${data.content}`;
+                        } else {
+                            selectedFileContent.value = data.content;
+                        }
+                    } else {
+                        selectedFileContent.value = "Error loading file.";
+                    }
+                };
+
+                const startAgent = async () => {
+                    if(config.value.workflow.length === 0) {
+                        alert("Workflow is empty! Please load default or add steps.");
+                        return;
+                    }
+                    const res = await fetch('/api/start', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(config.value)
+                    });
+                    if(res.ok) {
+                        isRunning.value = true;
+                        logs.value.push({type: 'log', time: new Date().toLocaleTimeString(), data: '🚀 Command Sent: Start Agent'});
+                    } else {
+                        const err = await res.json();
+                        alert(err.error);
+                    }
+                };
+
+                const stopAgent = async () => {
+                    const res = await fetch('/api/stop', { method: 'POST' });
+                    if(res.ok) {
+                        isRunning.value = false;
+                        logs.value.push({type: 'log', time: new Date().toLocaleTimeString(), data: '☠️ Command Sent: Kill Agent'});
+                    }
+                };
+
+                const stopAgentGracefully = async () => {
+                    const res = await fetch('/api/stop?graceful=true', { method: 'POST' });
+                    if(res.ok) {
+                        logs.value.push({type: 'log', time: new Date().toLocaleTimeString(), data: '🛑 Command Sent: Graceful Stop (Waiting for cycle end...)'});
+                    }
+                };
+                
+                // Workflow Methods
+                const loadDefaultWorkflow = async () => {
+                    const res = await fetch('/api/workflow');
+                    if(res.ok) {
+                        config.value.workflow = await res.json();
+                    }
+                };
+
+                const loadWorkflowFromPath = async () => {
+                    if (!workflowPath.value) return;
+                    const res = await fetch(`/api/workflow?path=${encodeURIComponent(workflowPath.value)}`);
+                    if(res.ok) {
+                        config.value.workflow = await res.json();
+                    } else {
+                        const err = await res.json();
+                        alert(err.error);
+                    }
+                };
+                
+                const addGlobalVar = () => {
+                    const keyInput = document.getElementById('newVarKey');
+                    const key = keyInput.value.trim();
+                    if (key && !config.value.global_vars[key]) {
+                        config.value.global_vars[key] = "";
+                        keyInput.value = "";
+                    }
+                };
+
+                const updateChangeableVars = (e) => {
+                    const val = e.target.value;
+                    config.value.llm_changeable_vars = val.split(',').map(s => s.trim()).filter(s => s);
+                };
+
+                const saveWorkflow = async () => {
+                    // In a real app this would post to backend
+                    alert("Workflow configuration is ready to be sent with Start Agent.");
+                };
+                
+                const addStep = (stepTemplate) => {
+                    const newStep = JSON.parse(JSON.stringify(stepTemplate)); // Deep copy
+                    newStep.name = newStep.label; // Default name
+                    config.value.workflow.push(newStep);
+                };
+                
+                const removeStep = (idx) => {
+                    config.value.workflow.splice(idx, 1);
+                    if(selectedStep.value === config.value.workflow[idx]) selectedStep.value = null;
+                };
+                
+                const duplicateStep = (idx) => {
+                    const step = config.value.workflow[idx];
+                    const newStep = JSON.parse(JSON.stringify(step));
+                    newStep.name += " (Copy)";
+                    config.value.workflow.splice(idx + 1, 0, newStep);
+                };
+                
+                const moveStep = (idx, dir) => {
+                    const newIdx = idx + dir;
+                    if (newIdx < 0 || newIdx >= config.value.workflow.length) return;
+                    const item = config.value.workflow.splice(idx, 1)[0];
+                    config.value.workflow.splice(newIdx, 0, item);
+                };
+                
+                const previewPrompt = (step) => {
+                    let user = step.config.user_template || '';
+                    let cmd = step.config.command || '';
+                    
+                    // Prepare Dummy Vars + Custom Vars
+                    const vars = {
+                        cwd: '/home/user/workspace/exp1.1.1',
+                        cycle: '1',
+                        total_cycles: '3',
+                        hypothesis: 'Optimize strategy Sharpe Ratio',
+                        exp_design: 'Added volatility filter.',
+                        result_analysis: 'Initial run.',
+                        lessons_text: '[No previous failures]',
+                        last_response: '[Output from previous step...]',
+                        B: '1', L: '1', S: '1',
+                        condition: 'new_branch',
+                        current_exp_folder: '/home/user/workspace/exp1.1.1',
+                        venv: '/path/to/venv/bin/python',
+                        ...config.value.global_vars // Inject User Custom Vars
+                    };
+                    
+                    // Format
+                    const fullPrompt = (user + '\n' + cmd);
+                    previewText.value = formatString(fullPrompt, vars);
+                };
+                
+                const printInitVars = () => {
+                    logs.value.push({
+                        type: 'log', 
+                        time: new Date().toLocaleTimeString(), 
+                        data: 'ℹ️ [DEBUG] Init Vars (Simulated):\n   current_exp_folder: /path/to/expX.Y.Z\n   B: 1, L: 1, S: 1\n   condition: auto'
+                    });
+                };
+
+                // Socket Events
+                socket.on('status', (msg) => {
+                    if (msg.data === 'stopped') {
+                        isRunning.value = false;
+                        logs.value.push({type: 'log', time: new Date().toLocaleTimeString(), data: '✅ Agent Stopped. Ready to restart.'});
+                    }
+                });
+
+                socket.on('log', (msg) => {
+                    msg.time = new Date().toLocaleTimeString();
+                    logs.value.push(msg);
+                    // Auto-scroll
+                    nextTick(() => {
+                        const el = document.getElementById('console');
+                        if(el) el.scrollTop = el.scrollHeight;
+                    });
+                });
+
+                return {
+                    currentTab, rootDir, fileTree, selectedFileContent, selectedFilePath,
+                    isRunning, logs, config, availableBranches, selectedStep, availableSteps, workflowPath, previewText, selectedCondition,
+                    changeRoot, loadFile, isImage, startAgent, stopAgent, stopAgentGracefully,
+                    loadDefaultWorkflow, loadWorkflowFromPath, saveWorkflow, addStep, removeStep, duplicateStep, moveStep, previewPrompt, printInitVars, addGlobalVar, updateChangeableVars
+                };
+            }
+        }).mount('#app');
+    </script>
+    {% endraw %}
+</body>
+</html>
