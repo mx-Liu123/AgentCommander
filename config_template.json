@@ -5,7 +5,7 @@
   "global_vars": {
     "DEFAULT_SYS": "You are an expert AI Data Scientist. Your goal is to minimize Mean Squared Error (MSE) on the Diabetes dataset. Modify `strategy.py` to  improve the `Strategy` class (sklearn model). Metric: MSE (Lower is better).",
     "plot_names": "",
-    "venv": "python"
+    "venv": "/home/username/.conda/envs/agent_commander/bin/python"
   },
   "llm_changeable_vars": [
     "hypothesis",
