@@ -82,14 +82,23 @@ def load_config():
     
     # Create default config if missing
     default_config = {
-        "root_dir": os.path.join(os.getcwd(), "example/diabetes_sklearn"),
-        "n_cycles": 5,
+        "root_dir": "./example/diabetes_sklearn",
+        "n_cycles": 10,
         "port": 8080,
         "global_vars": {
-            "DEFAULT_SYS": "You are an expert AI Data Scientist. Your goal is to minimize Mean Squared Error (MSE) on the Diabetes dataset. Modify `strategy.py` to improve the `Strategy` class (sklearn model). Metric: MSE (Lower is better).",
-        "venv": "python"
+            "DEFAULT_SYS": "You are an expert AI Data Scientist. Your goal is to minimize Mean Squared Error (MSE) on the Diabetes dataset. Modify `strategy.py` to  improve the `Strategy` class (sklearn model). Metric: MSE (Lower is better).",
+            "plot_names": "",
+            "venv": "/home/username/.conda/envs/agent_commander/bin/python"
         },
-        "llm_changeable_vars": ["hypothesis", "exp_design", "result_analysis", "hint"]
+        "llm_changeable_vars": [
+            "hypothesis",
+            "exp_design",
+            "result_analysis",
+            "hint"
+        ],
+        "mode": "new",
+        "resume_branch_id": "",
+        "workflow": "pylib/default_graph.json"
     }
     try:
         with open(CONFIG_FILE, 'w') as f:

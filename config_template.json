@@ -1,7 +1,7 @@
 {
   "root_dir": "./example/diabetes_sklearn",
   "n_cycles": 10,
-  "port": 8181,
+  "port": 8080,
   "global_vars": {
     "DEFAULT_SYS": "You are an expert AI Data Scientist. Your goal is to minimize Mean Squared Error (MSE) on the Diabetes dataset. Modify `strategy.py` to  improve the `Strategy` class (sklearn model). Metric: MSE (Lower is better).",
     "plot_names": "",
@@ -15,5 +15,5 @@
   ],
   "mode": "new",
   "resume_branch_id": "",
-  "workflow": "my_workflows/workflow_v1.json"
+  "workflow": "pylib/default_graph.json"
 }
