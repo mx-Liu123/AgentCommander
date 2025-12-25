@@ -1,5 +1,7 @@
 # AgentCommander
 
+miaoxin.liu@u.nus.edu
+
 AgentCommander is an advanced, graph-based workflow execution engine designed to orchestrate AI Agents for complex, iterative tasks. Built on top of the **Gemini CLI**, it empowers Machine Learning engineers and researchers to build highly customizable, infinite-loop workflows for tasks like **symbolic regression**, **hyperparameter optimization**, and **autonomous model refinement**.
 
 ![Control Panel](control_panel.png)
@@ -73,6 +75,7 @@ The `config.json` file controls the core behavior of the agent system. You can m
 *   **n_cycles**: The number of experiment iterations to run.
 *   **global_vars**: Variables available to the agent (e.g., system prompts, python paths).
 *   **llm_changeable_vars**: List of variables the LLM is allowed to modify in `history.json`.
+*   **workflow**: The workflow definition graph. Can be a full JSON object or a string path to a separate JSON file (e.g., `"my_workflows/workflow_v1.json"`).
 
 ## Security Considerations & Disclaimer
 

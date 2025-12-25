@@ -606,6 +606,18 @@ def start_agent():
         return jsonify({"error": "Agent already running"}), 400
         
     config = request.json
+    
+    # Resolve workflow if it's a path string
+    if isinstance(config.get('workflow'), str):
+        wf_path = (Path(CURRENT_ROOT_DIR) / config['workflow']).resolve()
+        if not wf_path.exists():
+            return jsonify({"error": f"Workflow file not found: {config['workflow']}"}), 400
+        try:
+            with open(wf_path, 'r', encoding='utf-8') as f:
+                config['workflow'] = json.load(f)
+        except Exception as e:
+            return jsonify({"error": f"Failed to load workflow file: {e}"}), 400
+
     # Inject environment python path if not set by user
     if 'venv' not in config.get('global_vars', {}):
         if 'global_vars' not in config: config['global_vars'] = {}
