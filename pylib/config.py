@@ -6,7 +6,7 @@ HISTORY_FILE = "improvement_history.md"
 BACKUP_DIR = "backups"
 
 # Gemini Config
-GEMINI_MODEL = "auto" # Set to 'auto' as requested
+GEMINI_MODEL = "auto-gemini-2.5" # Set to 'auto-gemini-2.5' as requested
 
 # Debug Mode
 DEBUG = os.environ.get("DEBUG", "false").lower() == "true"
