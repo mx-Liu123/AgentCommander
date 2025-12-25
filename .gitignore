@@ -2,6 +2,8 @@ backup_ui.sh
 config.json
 example/diabetes_sklearn/config_v1.json
 example/diabetes_sklearn/Branch1/
+example/diabetes_sklearn/__pycache__/
+example/diabetes_sklearn/.backup_branch_example/
 my_workflows/
 __pycache__/
 .ipynb_checkpoints/

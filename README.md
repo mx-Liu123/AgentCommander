@@ -1,18 +1,27 @@
 # AgentCommander
 
-AgentCommander is an advanced, graph-based workflow execution engine designed to orchestrate AI Agents for complex, iterative tasks. It provides a visual interface for designing workflows, managing experiments, and dynamically configuring agent behaviors.
+AgentCommander is an advanced, graph-based workflow execution engine designed to orchestrate AI Agents for complex, iterative tasks. Built on top of the **Gemini CLI**, it empowers Machine Learning engineers and researchers to build highly customizable, infinite-loop workflows for tasks like **symbolic regression**, **hyperparameter optimization**, and **autonomous model refinement**.
+
+![Control Panel](control_panel.png)
 
 ## Key Features
 
 *   **Visual Workflow Editor**: Design complex agent loops and decision trees using a node-based interface.
-*   **LLM Integration**: Seamlessly integrate with Large Language Models (LLMs) like Gemini and Claude for decision making and code generation.
+![Workflow Editor](workflow_editor.png)
+*   **Gemini CLI Integration**: Deeply integrated with the Gemini ecosystem for powerful, prompt-driven code generation and analysis.
+*   **Infinite Iteration**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely.
+*   **ML & Symbolic Regression**: specifically tailored to assist in discovering mathematical formulas and optimizing ML models through iterative experimentation.
 *   **Experiment Management**: Automatically track and visualize experiment history, metrics, and branches.
-*   **Dynamic Configuration**: Manage global variables and system settings through a centralized UI with support for multiple configuration profiles.
-*   **Robust Execution**: Includes features for session recovery, error handling, and parallel execution.
-*   **Web UI**: A modern, responsive web interface for real-time monitoring and control.
+*   **Dynamic Configuration**: Manage global variables and system settings through a centralized UI.
 
 ## Installation
 
+### Prerequisites
+1.  **Gemini CLI**: Ensure you have the Gemini CLI installed and configured.
+    *   *See official Gemini CLI documentation for installation instructions.*
+2.  **Python 3.10+**
+
+### Steps
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/yourusername/AgentCommander.git
@@ -64,6 +73,11 @@ The `config.json` file controls the core behavior of the agent system. You can m
 *   **n_cycles**: The number of experiment iterations to run.
 *   **global_vars**: Variables available to the agent (e.g., system prompts, python paths).
 *   **llm_changeable_vars**: List of variables the LLM is allowed to modify in `history.json`.
+
+## Todo
+
+*   [ ] **Claude Code Support**: Integrate Anthropic's Claude as an alternative LLM backend.
+*   [ ] **Parallel Workflow Example**: Add concrete examples and templates for running experiments in parallel.
 
 ## Contributing
 
