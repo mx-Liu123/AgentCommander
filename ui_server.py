@@ -207,7 +207,7 @@ def save_config_as_api():
         if not path_str or not new_conf:
             return jsonify({"error": "Path and config required"}), 400
             
-        target_path = Path(CURRENT_ROOT_DIR) / path_str
+        target_path = Path(os.getcwd()) / path_str
         target_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 1. Save to Target
@@ -233,7 +233,7 @@ def load_config_from_api():
         path_str = data.get('path')
         if not path_str: return jsonify({"error": "Path required"}), 400
         
-        target_path = Path(CURRENT_ROOT_DIR) / path_str
+        target_path = Path(os.getcwd()) / path_str
         if not target_path.exists():
             return jsonify({"error": "File not found"}), 404
             
