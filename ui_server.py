@@ -66,10 +66,11 @@ import shutil
 from pylib import llm_client
 
 # Constants
+APP_ROOT = Path(os.getcwd()).resolve()
 CACHE_DIR = Path("pylib/.cache")
 CACHE_FILE = CACHE_DIR / "current_graph.json"
 DEFAULT_TEMPLATE = Path("pylib/default_graph.json")
-CONFIG_FILE = Path("config.json")
+CONFIG_FILE = APP_ROOT / "config.json"
 
 # Load Config
 def load_config():
