@@ -291,9 +291,8 @@ def workflow_api():
                 # We expect data to contain: content (graph), global_vars, llm_changeable_vars
                 save_data = data.get('content', {}) # This is the graph (nodes/edges)
                 
-                # Merge extra fields if provided
-                if 'global_vars' in data: save_data['global_vars'] = data['global_vars']
-                if 'llm_changeable_vars' in data: save_data['llm_changeable_vars'] = data['llm_changeable_vars']
+                # Decoupling: Do NOT save global_vars/llm_changeable_vars to workflow file
+                # They are managed by config.json
                 
                 with open(CACHE_FILE, 'w') as f: json.dump(save_data, f, indent=2)
                 
@@ -307,8 +306,7 @@ def workflow_api():
                 
                 # Construct data
                 save_data = data.get('content', {})
-                if 'global_vars' in data: save_data['global_vars'] = data['global_vars']
-                if 'llm_changeable_vars' in data: save_data['llm_changeable_vars'] = data['llm_changeable_vars']
+                # Decoupling: Do NOT save global_vars/llm_changeable_vars to workflow file
                 
                 # Write to Target
                 with open(target_path, 'w') as f: json.dump(save_data, f, indent=2)
