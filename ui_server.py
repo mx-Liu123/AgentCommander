@@ -164,7 +164,9 @@ def get_config():
         except: pass
     
     # Merge config into response
-    return jsonify({
+    # Start with full conf to include mode, resume_branch_id, etc.
+    response = conf.copy()
+    response.update({
         "root_dir": CURRENT_ROOT_DIR,
         "branches": get_branches(CURRENT_ROOT_DIR),
         "global_vars": conf.get('global_vars', {}),
@@ -172,6 +174,7 @@ def get_config():
         "n_cycles": conf.get('n_cycles', 1),
         "port": conf.get('port', 8080)
     })
+    return jsonify(response)
 
 @app.route('/api/save_config', methods=['POST'])
 def save_config_api():

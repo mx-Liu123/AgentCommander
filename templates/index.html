@@ -718,8 +718,16 @@
                             taskRoot.value = data.root_dir;
                             explorerRoot.value = data.root_dir;
                             availableBranches.value = data.branches;
-                            if (Object.keys(config.value.global_vars).length === 0 && data.default_global_vars) config.value.global_vars = data.default_global_vars;
-                            if (config.value.llm_changeable_vars.length === 0 && data.default_llm_changeable_vars) config.value.llm_changeable_vars = data.default_llm_changeable_vars;
+                            
+                            // Full config sync
+                            if (data.global_vars) config.value.global_vars = data.global_vars;
+                            if (data.llm_changeable_vars) config.value.llm_changeable_vars = data.llm_changeable_vars;
+                            if (data.mode) config.value.mode = data.mode;
+                            if (data.resume_branch_id) config.value.resume_branch_id = data.resume_branch_id;
+                            if (data.n_cycles) config.value.n_cycles = data.n_cycles;
+                            if (data.branch_name) config.value.branch_name = data.branch_name;
+                            if (data.parent_exp) config.value.parent_exp = data.parent_exp;
+                            if (data.branch_hint) config.value.branch_hint = data.branch_hint;
                         }
 
                         // Restore Status & Logs
