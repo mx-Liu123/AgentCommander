@@ -75,6 +75,36 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
     *   Click "Start Agent" to begin the automated experiment loop.
     *   Monitor progress in the "Console" and "Explorer" tabs.
 
+## Reference Experiment Structure
+
+To help you get started, the `example/diabetes_sklearn/` directory provides a reference implementation for organizing your machine learning experiments. This structure is designed to be robust and prevent "cheating" by the LLM.
+
+### 1. File Organization
+*   **Root Evaluation Script (`evaluator.py`)**: Placed at the project root (e.g., `example/diabetes_sklearn/evaluator.py`), this file serves as the ground truth for assessment. It should be treated as **immutable** by the LLM. By keeping it outside the experiment's working directory, we prevent the agent from modifying the evaluation logic to artificially inflate scores.
+*   **Seed Experiment Directory (`Branch_example/exp_example/`)**: This folder acts as the "seed" for your evolutionary tree. It contains the initial `strategy.py` (the model or logic to be improved) and any auxiliary files required for execution.
+
+### 2. Execution Flow
+In the default workflow, the agent evaluates a strategy by running a shell command similar to this:
+
+```bash
+cd {current_exp_path} && \
+export PYTHONPATH=$PYTHONPATH:../../ && \
+{venv} -c "from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))" > eval_out.txt 2>&1; \
+cat eval_out.txt
+```
+
+*   **Isolation**: The command changes directory to the specific experiment folder (`{current_exp_path}`).
+*   **Context**: It adds the project root to `PYTHONPATH` so the local `strategy.py` can be imported by the root `evaluator.py`.
+*   **Output**: All generated files (metrics, logs, artifacts) remain contained within the experiment directory, ensuring a clean workspace for every iteration.
+
+### 3. Hyperparameter Search Pattern
+The provided example also demonstrates a pattern for hyperparameter optimization:
+*   **`strategy.py`**: Defines both the model logic and the parameter space to be searched.
+*   **`evaluator.py`**: Imports the strategy, reads the parameter space, and executes the search (e.g., Grid Search, Bayesian Optimization), returning the best metric found.
+
+### Note on Customization
+Because the AgentCommander workflow is graph-based and highly customizable, this structure is merely a **recommendation**. You are free to modify the folder hierarchy, execution commands, and evaluation logic to fit the specific needs of your project.
+
 ## Configuration
 
 The `config.json` file controls the core behavior of the agent system. You can manage this file directly via the UI's "Control Panel".
