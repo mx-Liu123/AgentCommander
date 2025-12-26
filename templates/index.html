@@ -851,10 +851,45 @@
                 };
                 
                 const goUpDir = async () => {
-                    const parts = explorerRoot.value.split('/').filter(p=>p);
-                    parts.pop();
-                    explorerRoot.value = '/' + parts.join('/');
-                    if(explorerRoot.value === '//') explorerRoot.value = '/';
+                    let current = explorerRoot.value;
+                    // Normalize slashes
+                    current = current.replace(/\\/g, '/');
+                    
+                    // Check if it's absolute
+                    const isAbs = current.startsWith('/');
+                    
+                    // Split into parts, filtering out empty strings
+                    const parts = current.split('/').filter(p => p);
+                    
+                    // Handle relative prefix '.'
+                    let isRelative = false;
+                    if (parts[0] === '.') {
+                        isRelative = true;
+                        parts.shift(); // Remove '.' for processing
+                    } else if (!isAbs && current !== '') {
+                        // If not absolute and doesn't start with '.', treat as relative
+                        isRelative = true;
+                    }
+
+                    if (parts.length > 0) {
+                        parts.pop(); // Go up one level
+                    }
+                    
+                    // Reconstruct
+                    if (isAbs) {
+                        explorerRoot.value = '/' + parts.join('/');
+                        // Ensure root is /
+                        if (explorerRoot.value === '//' || explorerRoot.value === '') explorerRoot.value = '/';
+                    } else {
+                        // Relative
+                        if (parts.length === 0) {
+                            // If we popped everything, we are at root (relative)
+                            explorerRoot.value = '.'; 
+                        } else {
+                            explorerRoot.value = './' + parts.join('/');
+                        }
+                    }
+                    
                     await loadFiles();
                 };
 
