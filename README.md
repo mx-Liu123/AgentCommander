@@ -10,12 +10,12 @@ AgentCommander is an advanced, graph-based workflow execution engine designed to
 
 ## Key Features
 
-*   **Visual Workflow Editor**: Design complex agent loops and decision trees using a node-based interface.
+*   **Visual Workflow Editor with AI Assistant**: Design complex agent loops and decision trees using a node-based interface, enhanced by a built-in AI Assistant that can modify the workflow directly via natural language commands (e.g., "Add a shell check after step 2").
 ![Workflow Editor](workflow_editor.png)
 *   **Gemini CLI Integration**: Deeply integrated with the Gemini ecosystem for powerful, prompt-driven code generation and analysis.
-*   **Infinite Iteration**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely.
+*   **Infinite Iteration & Advanced Learning**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely. Advanced features like the **"Lesson" mechanism** (to learn from past errors) and **online search integration** (for inspiration) are available in example workflows to boost continuous improvement.
 *   **ML & Symbolic Regression**: specifically tailored to assist in discovering mathematical formulas and optimizing ML models through iterative experimentation.
-*   **Experiment Management**: Automatically track and visualize experiment history, metrics, and branches.
+*   **Experiment Management & Evolutionary Tree**: Automatically track and visualize experiment history, metrics, and branches as an **"evolutionary tree"**, where each experiment node connects to its parent.
 *   **Dynamic Configuration**: Manage global variables and system settings through a centralized UI.
 
 ## Installation
@@ -82,6 +82,7 @@ To help you get started, the `example/diabetes_sklearn/` directory provides a re
 ### 1. File Organization
 *   **Root Evaluation Script (`evaluator.py`)**: Placed at the project root (e.g., `example/diabetes_sklearn/evaluator.py`), this file serves as the ground truth for assessment. It should be treated as **immutable** by the LLM. By keeping it outside the experiment's working directory, we prevent the agent from modifying the evaluation logic to artificially inflate scores.
 *   **Seed Experiment Directory (`Branch_example/exp_example/`)**: This folder acts as the "seed" for your evolutionary tree. It contains the initial `strategy.py` (the model or logic to be improved) and any auxiliary files required for execution.
+*   **Experiment History (`history.json`)**: Within each experiment directory, `history.json` automatically stores all calculated metrics and the optimal results. The workflow can conveniently write key-value pairs into this file using the `write_history` module.
 
 ### 2. Execution Flow
 In the default workflow, the agent evaluates a strategy by running a shell command similar to this:
@@ -102,6 +103,14 @@ The provided example also demonstrates a pattern for hyperparameter optimization
 *   **`strategy.py`**: Defines both the model logic and the parameter space to be searched.
 *   **`evaluator.py`**: Imports the strategy, reads the parameter space, and executes the search (e.g., Grid Search, Bayesian Optimization), returning the best metric found.
 
+### 4. Evolutionary Progress Logic (B, L, S)
+The example workflow uses a Branch (B), Level (L), Step (S) logic to manage evolutionary progress:
+*   **Branch (B)**: A new branch is typically initiated manually, often when a significant breakthrough or new conceptual direction is explored.
+*   **Level (L)**: Represents a progression in depth, advanced when an experiment shows significant improvement or a breakthrough.
+*   **Step (S)**: Denotes different explorations within the same level when no breakthrough is achieved. Each new step is based on the optimal result from the previous (L-1) level, allowing for iterative refinement.
+
+This mechanism is implemented within the example workflow and is fully modifiable by the user to suit their specific progress tracking needs.
+
 ### Note on Customization
 Because the AgentCommander workflow is graph-based and highly customizable, this structure is merely a **recommendation**. You are free to modify the folder hierarchy, execution commands, and evaluation logic to fit the specific needs of your project.
 
@@ -111,13 +120,16 @@ The `config.json` file controls the core behavior of the agent system. You can m
 
 *   **root_dir**: The working directory where experiments and data are stored.
 *   **n_cycles**: The number of experiment iterations to run.
-*   **global_vars**: Variables available to the agent (e.g., system prompts, python paths).
-*   **llm_changeable_vars**: List of variables the LLM is allowed to modify in `history.json`.
+*   **global_vars**: These are hardcoded environment variables (e.g., API keys, system paths) accessible throughout the workflow.
+*   **llm_changeable_vars**: A list of variable names that the LLM is explicitly allowed to modify during runtime. These often represent hyperparameters or learned parameters.
 *   **workflow**: The workflow definition graph. Can be a full JSON object or a string path to a separate JSON file (e.g., `"my_workflows/workflow_v1.json"`).
+*   **Shared Context**: All nodes in the workflow exchange data through a shared variable pool, known as the `context`. This allows for flexible data flow between different modules without strict parameter passing.
 
 ## Tips & Best Practices
 
 *   **Optimizing ML Parameter Search**: For a good balance between model iteration speed and computational cost, a duration of **20-30 minutes** for an `exp` directory coupled with ML parameter searching is often a cost-effective approach. This allows sufficient exploration without excessive expenditure.
+*   **Prompt Templating**: Within `llm_generate` nodes, you can use Jinja2-like templating syntax (e.g., `{{ variable_name }}`) to dynamically inject values from the shared context into your prompts. This is crucial for creating adaptive and data-driven agents.
+*   **Debugging Prompts with `gemini -r`**: After running your workflow, you can use the `gemini -r` command in the corresponding experiment directory (`cd {exp_path} && gemini -r`) to restore the latest conversation. This allows you to inspect the exact prompt that was sent to the LLM, verifying that your templating and context variables are working as expected.
 
 ## Security Considerations & Disclaimer
 
