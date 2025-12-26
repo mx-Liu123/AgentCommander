@@ -362,8 +362,12 @@
                     <div class="input-group input-group-sm mb-2">
                         <select class="form-select bg-dark text-light border-secondary" v-model="chatModel">
                             <option value="auto-gemini-3">Auto (Gemini 3)</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                             <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                             <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                            <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+                            <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                            <option value="auto-gemini-2.5">Auto (Gemini 2.5)</option>
                         </select>
                         <button class="btn btn-outline-danger" @click="resetChatSession" title="New Session">🗑️ Reset</button>
                     </div>
