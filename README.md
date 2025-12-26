@@ -27,6 +27,8 @@ AgentCommander is an advanced, graph-based workflow execution engine designed to
 ### Gemini CLI Configuration Recommendation
 To leverage the latest capabilities, including the powerful Pro3 and Flash3 models, it is highly recommended to enable "Gemini Preview" in your Gemini CLI settings. This allows AgentCommander to access cutting-edge model versions.
 
+*   **Note for Students**: Gemini currently offers a one-year free Pro user trial for student accounts. This is a great opportunity to explore the full potential of the latest Gemini models.
+
 2.  **Python 3.10+**
 
 ### Steps
@@ -82,6 +84,10 @@ The `config.json` file controls the core behavior of the agent system. You can m
 *   **global_vars**: Variables available to the agent (e.g., system prompts, python paths).
 *   **llm_changeable_vars**: List of variables the LLM is allowed to modify in `history.json`.
 *   **workflow**: The workflow definition graph. Can be a full JSON object or a string path to a separate JSON file (e.g., `"my_workflows/workflow_v1.json"`).
+
+## Tips & Best Practices
+
+*   **Optimizing ML Parameter Search**: For a good balance between model iteration speed and computational cost, a duration of **20-30 minutes** for an `exp` directory coupled with ML parameter searching is often a cost-effective approach. This allows sufficient exploration without excessive expenditure.
 
 ## Security Considerations & Disclaimer
 
