@@ -226,7 +226,7 @@
 
                     <div v-if="currentTab === 'explorer'">
                         <div class="input-group mb-2" id="tour-fe-nav">
-                            <button class="btn btn-secondary" @click="goUpDir">⬆ Up</button>
+                            <button class="btn btn-secondary" @click="goUpDir" :disabled="isAtRoot">⬆ Up</button>
                             <input id="fe-root" type="text" class="form-control" v-model="explorerRoot" @change="loadFiles">
                             <button class="btn btn-outline-secondary" @click="loadFiles">Go</button>
                             <button class="btn btn-outline-success" @click="createNewFile">➕ New File</button>
@@ -662,6 +662,18 @@
                 const saveStatus = ref('');
                 let fileModal = null;
                 
+                const isAtRoot = computed(() => {
+                    const norm = (p) => {
+                        if (!p) return '';
+                        let s = p.replace(/\\/g, '/');
+                        if (s.startsWith('./')) s = s.substring(2);
+                        if (s.endsWith('/')) s = s.slice(0, -1);
+                        if (s === '.' || s === '') return '';
+                        return s;
+                    };
+                    return norm(explorerRoot.value) === norm(taskRoot.value);
+                });
+                
                 // D3 State for Search
                 let vizZoom = null;
                 let vizSvg = null;
@@ -851,6 +863,7 @@
                 };
                 
                 const goUpDir = async () => {
+                    if (isAtRoot.value) return;
                     let current = explorerRoot.value;
                     // Normalize slashes
                     current = current.replace(/\\/g, '/');
@@ -1705,7 +1718,7 @@
                 };
 
                 return {
-                    currentTab, isRunning, logs, config, taskRoot, explorerRoot, fileList, availableBranches,
+                    currentTab, isRunning, logs, config, taskRoot, explorerRoot, isAtRoot, fileList, availableBranches,
                     graphStack, currentGraph, pan, zoom, selectedNode, selectedEdge, dragEdge,
                     loadWorkflowFromCache, navToLevel, nodeDblClick,
                     dragStart, onDrop, onMouseDown, onMouseMove, onMouseUp, 
