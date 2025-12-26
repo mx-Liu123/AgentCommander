@@ -99,7 +99,7 @@ def load_config():
         ],
         "mode": "new",
         "resume_branch_id": "",
-        "workflow": "pylib/default_graph.json"
+        "workflow": "pylib/.cache/current_graph.json"
     }
     try:
         with open(CONFIG_FILE, 'w') as f:
@@ -644,6 +644,7 @@ def update_vars_api():
 @app.route('/api/start', methods=['POST'])
 def start_agent():
     global agent_process
+    ensure_cache() # Ensure default cache exists if targeted
     if agent_process and agent_process.is_alive():
         return jsonify({"error": "Agent already running"}), 400
         
@@ -651,9 +652,19 @@ def start_agent():
     
     # Resolve workflow if it's a path string
     if isinstance(config.get('workflow'), str):
-        wf_path = (Path(CURRENT_ROOT_DIR) / config['workflow']).resolve()
-        if not wf_path.exists():
-            return jsonify({"error": f"Workflow file not found: {config['workflow']}"}), 400
+        wf_path_str = config['workflow']
+        wf_path_task = (Path(CURRENT_ROOT_DIR) / wf_path_str).resolve()
+        wf_path_app = (APP_ROOT / wf_path_str).resolve()
+        
+        wf_path = None
+        if wf_path_task.exists():
+            wf_path = wf_path_task
+        elif wf_path_app.exists():
+            wf_path = wf_path_app
+            
+        if not wf_path:
+            return jsonify({"error": f"Workflow file not found: {wf_path_str} (checked in task root and app root)"}), 400
+            
         try:
             with open(wf_path, 'r', encoding='utf-8') as f:
                 config['workflow'] = json.load(f)

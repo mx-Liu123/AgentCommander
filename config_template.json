@@ -15,5 +15,5 @@
   ],
   "mode": "new",
   "resume_branch_id": "",
-  "workflow": "pylib/default_graph.json"
+  "workflow": "pylib/.cache/current_graph.json"
 }
