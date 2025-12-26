@@ -1,10 +1,37 @@
+<div align="center">
+
 # AgentCommander
 
-miaoxin.liu@u.nus.edu
+**Automating the loop of discovery.**
 
-As an NUS Astrophysics PhD student, I created AgentCommander out of a deep personal need to streamline the iterative process of machine learning model development and debugging. My motivation stems from the belief that the exhaustive trial-and-error inherent in ML research should not be a burden for human developers. Instead, these repetitive, yet crucial, tasks are ideally suited for automation, freeing up human intelligence to focus on higher-level creative pursuits, systemic design, and conceptual exploration. AgentCommander is my answer to this, aiming to automate the tedious parts of ML iteration so researchers can dedicate their energy to innovation.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Gemini CLI](https://img.shields.io/badge/Powered%20by-Gemini%20CLI-8E75B2)](https://ai.google.dev/)
 
-AgentCommander is an advanced, graph-based workflow execution engine designed to orchestrate AI Agents for complex, iterative tasks. Built on top of the **Gemini CLI**, it empowers Machine Learning engineers and researchers to build highly customizable, infinite-loop workflows for tasks like **symbolic regression**, **hyperparameter optimization**, and **autonomous model refinement**.
+</div>
+
+---
+
+## Motivation
+
+Born from the complex computational needs of scientific research, AgentCommander addresses a critical bottleneck in machine learning: the exhaustive cost of manual trial-and-error. 
+
+We built this tool on the belief that repetitive iteration is a task for machines, not humans. By automating the debugging and refinement cycle, AgentCommander empowers researchers to focus on high-level creative pursuits and systemic design.
+
+## What is AgentCommander?
+
+AgentCommander is an advanced, **graph-based workflow execution engine** designed to orchestrate AI Agents for complex, iterative tasks. Built on top of the **Gemini CLI**, it enables Machine Learning engineers to construct highly customizable, infinite-loop workflows.
+
+### Key Capabilities
+
+* **Symbolic Regression** Automating the search for mathematical expressions.
+* **Hyperparameter Optimization** Intelligent tuning without manual intervention.
+* **Autonomous Model Refinement** Self-correcting loops for model improvement.
+
+---
+
+## Contact
+📧 **Email:** [miaoxin.liu@u.nus.edu](mailto:miaoxin.liu@u.nus.edu)
 
 ![Control Panel](control_panel.png)
 
