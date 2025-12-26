@@ -2,6 +2,8 @@
 
 miaoxin.liu@u.nus.edu
 
+As an NUS Astrophysics PhD student, I created AgentCommander out of a deep personal need to streamline the iterative process of machine learning model development and debugging. My motivation stems from the belief that the exhaustive trial-and-error inherent in ML research should not be a burden for human developers. Instead, these repetitive, yet crucial, tasks are ideally suited for automation, freeing up human intelligence to focus on higher-level creative pursuits, systemic design, and conceptual exploration. AgentCommander is my answer to this, aiming to automate the tedious parts of ML iteration so researchers can dedicate their energy to innovation.
+
 AgentCommander is an advanced, graph-based workflow execution engine designed to orchestrate AI Agents for complex, iterative tasks. Built on top of the **Gemini CLI**, it empowers Machine Learning engineers and researchers to build highly customizable, infinite-loop workflows for tasks like **symbolic regression**, **hyperparameter optimization**, and **autonomous model refinement**.
 
 ![Control Panel](control_panel.png)
@@ -21,6 +23,10 @@ AgentCommander is an advanced, graph-based workflow execution engine designed to
 ### Prerequisites
 1.  **Gemini CLI**: Ensure you have the Gemini CLI installed and configured.
     *   *See official Gemini CLI documentation for installation instructions.*
+
+### Gemini CLI Configuration Recommendation
+To leverage the latest capabilities, including the powerful Pro3 and Flash3 models, it is highly recommended to enable "Gemini Preview" in your Gemini CLI settings. This allows AgentCommander to access cutting-edge model versions.
+
 2.  **Python 3.10+**
 
 ### Steps
@@ -81,6 +87,7 @@ The `config.json` file controls the core behavior of the agent system. You can m
 
 While AgentCommander leverages the Gemini CLI, which primarily operates within its designated working directory, it's crucial to understand the inherent risks:
 
+*   **Gemini Model Access (Default YOLO Mode)**: By default, when invoked by AgentCommander, Gemini models operate with the `-y` (YOLO - You Only Live Once) parameter. This means the model is granted permission to use *any* available tool and has *arbitrary privileges* within the working directory. This design choice enables powerful automation but requires extreme caution.
 *   **File Access Scope**: The Gemini CLI typically focuses on files within the specified working directory (`root_dir`). However, any generated scripts or commands executed by the agent **theoretically could interact with or modify files outside this directory**, especially if the agent's logic or your system's configuration allows it.
 *   **Best Practices**: For maximum security, it is highly recommended to:
     *   **Use a Sandboxed Environment**: Run AgentCommander and its agents within a container (e.g., Docker) or a virtual machine.

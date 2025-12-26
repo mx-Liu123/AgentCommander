@@ -71,16 +71,28 @@
       "target": "meta_analysis_llm"
     },
     {
-      "source": "meta_analysis_llm",
-      "target": "reset_fail_count"
-    },
-    {
       "source": "reset_fail_count",
       "target": "next_attempt"
+    },
+    {
+      "label": null,
+      "source": "meta_analysis_llm",
+      "target": "n_1766633725413"
+    },
+    {
+      "label": null,
+      "source": "n_1766633725413",
+      "target": "n_1766633914418"
+    },
+    {
+      "label": null,
+      "source": "n_1766633914418",
+      "target": "reset_fail_count"
     }
   ],
   "global_vars": {
     "DEFAULT_SYS": "  You are an expert AI Quantitative Researcher specializing in Deep Learning for Market Regime\n  Modeling.\n\n  Your Goal:\n  Minimize the NLL Loss Score (Target -> 0.0) of a CNN+LSTM model that predicts the\n  Time-to-Next-Event (Peak or Trough) in BTC/USDT price action.\n   * Metric: NLL Loss Score. Lower is better.\n\n  Workflow:\n   1. Modify `extract_features` in `strategy.py`: Combine technical indicators (TALib),\n      price/volume transforms, and temporal features.\n   2. Evaluate: The external system runs evaluator.py, which trains your model on historical data\n      and tests it via Walk-Forward Analysis.\n   3. Iterate: Use the feedback (NLL Loss Score) to refine your feature set. If the score is\n      high, your features are not informative enough.\n\n  Constraints:\n   * Stationarity: Inputs must be relative/normalized (e.g., Price / MA, not raw Price).\n   * Causality: No future data peeking.\n   * Stability: Avoid NaN/Inf values. Use log1p for skewed distributions like Volume or Time.",
+    "plot_names": "@btcusdt_WFA_1.png, @btcusdt_WFA_6.png, @btcusdt_WFA_7.png",
     "venv": "/home/liumx/.conda/envs/lean/bin/python"
   },
   "id": "root_graph",
@@ -256,24 +268,25 @@
               "id": "sub_start",
               "label": "Sub Start",
               "position": {
-                "x": -602,
-                "y": 122
+                "x": -789,
+                "y": 104
               },
               "type": "start"
             },
             {
               "config": {
-                "model": "gemini-3-flash",
+                "model": "auto-gemini-3",
+                "response_output": "hypothesis_output",
                 "session_id_output": "session_v1",
                 "session_mode": "new",
                 "timeout": 600,
-                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nCurrent Working Directory: {current_exp_path}\nVenv: {venv}\nCycle: {cycle}/{n_cycles}\nPrevious Hypothesis: {hypothesis}\nPrevious Experiment Design: {exp_design}\nPrevious Results: {result_analysis}\nImproved from Parent: {is_improved}\nMore experiment record:\n{lessons_text}\n\nHuman Instructions:\nstep1: Analyze the previous research context. Read the strategy code (*.py) code. \nstep2: Output a hypothesis to improve the strategy in string format."
+                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nCurrent Working Directory: {current_exp_path}\nVenv: {venv}\nCycle: {cycle}/{n_cycles}\nPrevious Hypothesis: {hypothesis}\nPrevious Experiment Design: {exp_design}\nPrevious Results: {result_analysis}\nImproved from Parent: {is_improved}\nMore experiment record:\n{lessons_text}\n\nHuman Instructions:\nstep1: Analyze the previous research context. Read the strategy code (*.py) code. Make sure you read the important result picture {plot_names}. They are bad windows in @eval_out.txt.\nstep2: Output a plan to improve the strategy in string format. explain how it relates to ur analysis."
               },
               "id": "step1_impl",
               "label": "1.make hypothesis",
               "position": {
-                "x": -272,
-                "y": 113
+                "x": -466,
+                "y": 124
               },
               "type": "llm_generate"
             },
@@ -287,8 +300,8 @@
               "id": "step1_save_session",
               "label": "1.1 Save Session ID",
               "position": {
-                "x": -384,
-                "y": 348
+                "x": -498,
+                "y": 545
               },
               "type": "write_history"
             },
@@ -377,12 +390,13 @@
               "type": "condition_code"
             },
             {
+              "config": {
                 "model": "auto-gemini-3",
                 "response_output": "supervisor_log",
                 "session_id_input": "session_v1",
                 "session_mode": "inherit",
                 "timeout": 600,
-                "user_template": "{DEFAULT_SYS}\nnow we just have a breakthrough, you need to check if this breakthrough is reliable.\ntask1:\nMainly by checking if the images are normal: ./*.png. If not normal, analyze the reason.\ntask2:\nBased on your analysis, update ./history.json key 'supervisor comment', 'if_improved'. If this breakthrough is achieved by cheating (manipulating evaluation standards or significantly adjusting the number of high/low points), or is not reliable, then you must change 'if_improved'=False."
+                "user_template": "{DEFAULT_SYS}\nnow we just have a breakthrough, you need to check if this breakthrough is reliable.\ntask1:\nMainly by checking if the images are normal: {plot_names}. If not normal, analyze the reason.\ntask2:\nBased on your analysis, update ./history.json key 'supervisor comment', 'if_improved'. If this breakthrough is achieved by cheating (manipulating evaluation standards or significantly adjusting the number of high/low points), or is not reliable, then you must change 'if_improved'=False."
               },
               "id": "step9_supervisor",
               "label": "Supervisor Check",
@@ -416,7 +430,8 @@
             },
             {
               "config": {
-                "model": "gemini-3-flash",
+                "model": "gemini-3-flash-preview",
+                "response_output": "llm_response",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
                 "session_mode": "inherit",
@@ -426,8 +441,8 @@
               "id": "n_1766207420852",
               "label": "2. implement",
               "position": {
-                "x": 128,
-                "y": 137
+                "x": -159,
+                "y": 123
               },
               "type": "llm_generate"
             },
@@ -441,8 +456,8 @@
               "id": "n_1766207472527",
               "label": "1.2 save hypothesis",
               "position": {
-                "x": -88,
-                "y": 361
+                "x": -26,
+                "y": 549
               },
               "type": "write_history"
             },
@@ -453,14 +468,14 @@
               "id": "step3_init_vars",
               "label": "3. Init Correction Vars",
               "position": {
-                "x": 373,
-                "y": 224
+                "x": 377,
+                "y": 228
               },
               "type": "python_script"
             },
             {
               "config": {
-                "code": "result = (not context.get('is_improved', False)) and (context.get('correction_trials', 0) < 5)"
+                "code": "result = (not context.get('is_improved', False)) and (context.get('correction_trials', 0) < 3)"
               },
               "id": "step5_1_check_retry",
               "label": "5.1 Retry?",
@@ -472,7 +487,7 @@
             },
             {
               "config": {
-                "model": "gemini-3-flash",
+                "model": "gemini-3-flash-preview",
                 "response_output": "correction_log",
                 "session_id_input": "session_v1",
                 "session_mode": "inherit",
@@ -503,7 +518,7 @@
             },
             {
               "config": {
-                "model": "gemini-2.5-flash-lite",
+                "model": "gemini-3-flash-preview",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
                 "session_mode": "inherit",
@@ -520,7 +535,7 @@
             },
             {
               "config": {
-                "model": "gemini-2.5-flash-lite",
+                "model": "gemini-3-flash-preview",
                 "response_output": "result_analysis",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
@@ -568,19 +583,19 @@
             },
             {
               "config": {
-                "code": "val = context.get('hypothesis_output', '')\nif isinstance(val, str) and len(val) > 400:\n    # \u4fee\u6b63\uff1a\u786e\u4fdd\u5b57\u7b26\u4e32\u62fc\u63a5\u5728\u540c\u4e00\u884c\uff0c\u6216\u8005\u4f7f\u7528\u6b63\u786e\u7684\u5b57\u7b26\u4e32\u8fde\u63a5\u7b26\n    context['hypothesis_output'] = val[:200] + '...[TRUNCATED]...' + val[-200:]\n    logger.log(f\"Trimmed 'hypothesis_output' from {len(val)} to {len(context['hypothesis_output'])} chars\")\n"
+                "code": "val = context.get('hypothesis_output', '')\nstr_len = 6000\nhalf_len = 3000\nif isinstance(val, str) and len(val) > str_len:\n    context['hypothesis_output'] = val[:half_len] + '...[TRUNCATED]...' + val[-half_len:]\n    logger.log(f\"Trimmed 'hypothesis_output' from {len(val)} to {len(context['hypothesis_output'])} chars\")\n"
               },
               "id": "trim_hypothesis",
               "label": "Trim Hypothesis",
               "position": {
                 "x": -254,
-                "y": 549
+                "y": 551
               },
               "type": "python_script"
             },
             {
               "config": {
-                "code": "val = context.get('experiment_design', '')\nif isinstance(val, str) and len(val) > 400:\n    # \u4f7f\u7528 \\n \u4ee3\u8868\u6362\u884c\uff0c\u4fdd\u6301\u4ee3\u7801\u5728\u540c\u4e00\u884c\n    context['experiment_design'] = val[:200] + '\\n...[TRUNCATED]...\\n' + val[-200:]\n    logger.log(f\"Trimmed 'experiment_design' from {len(val)} to {len(context['experiment_design'])} chars\")"
+                "code": "val = context.get('experiment_design', '')\nstr_len = 6000\nhalf_len = 3000\nif isinstance(val, str) and len(val) > str_len:\n    context['experiment_design'] = val[:half_len] + '\\n...[TRUNCATED]...\\n' + val[-half_len:]\n    logger.log(f\"Trimmed 'experiment_design' from {len(val)} to {len(context['experiment_design'])} chars\")"
               },
               "id": "trim_exp_design",
               "label": "Trim Exp Design",
@@ -592,7 +607,7 @@
             },
             {
               "config": {
-                "code": "val = context.get('result_analysis', '')\nif isinstance(val, str) and len(val) > 400:\n    # \u540c\u6837\u4fee\u590d\u6b64\u5904\n    context['result_analysis'] = val[:200] + '\\n...[TRUNCATED]...\\n' + val[-200:]\n    logger.log(f\"Trimmed 'result_analysis' from {len(val)} to {len(context['result_analysis'])} chars\")"
+                "code": "val = context.get('result_analysis', '')\nstr_len = 6000\nhalf_len = 3000\nif isinstance(val, str) and len(val) > str_len:\n    context['result_analysis'] = val[:half_len] + '\\n...[TRUNCATED]...\\n' + val[-half_len:]\n    logger.log(f\"Trimmed 'result_analysis' from {len(val)} to {len(context['result_analysis'])} chars\")"
               },
               "id": "trim_result_analysis",
               "label": "Trim Result Analysis",
@@ -701,13 +716,13 @@
     },
     {
       "config": {
-        "code": "result = context['consecutive_failures'] >= 5"
+        "code": "result = context['consecutive_failures'] >= 3"
       },
       "id": "check_fail_threshold",
       "label": "Fail >= 5?",
       "position": {
-        "x": 800,
-        "y": 600
+        "x": 564,
+        "y": 672
       },
       "type": "condition_code"
     },
@@ -718,8 +733,8 @@
       "id": "restore_last_success",
       "label": "Restore Last Success",
       "position": {
-        "x": 1000,
-        "y": 600
+        "x": 836,
+        "y": 673
       },
       "type": "python_script"
     },
@@ -732,26 +747,27 @@
         "scope": "All History"
       },
       "id": "meta_lesson",
-      "label": "Meta Lesson",
+      "label": "Hint Lesson",
       "position": {
-        "x": 1200,
-        "y": 600
+        "x": 1065,
+        "y": 672
       },
       "type": "lesson"
     },
     {
-                    "config": {
-                      "model": "auto-gemini-3",        "response_output": "meta_hint",
+      "config": {
+        "model": "auto-gemini-3",
+        "response_output": "hint_output",
         "session_id_input": "gemini_session_id",
         "session_mode": "inherit",
         "timeout": 1200,
-        "user_template": "{DEFAULT_SYS}\nPrevious experiment records:\n{meta_lessons}\nPrevious web hint:\n{hint}\nresult plot: btcusdt_WFA_1.png\n\nHuman: now, the current experiments have failed to achieve a breakthrough. Analyze the code in the current working directory and the history. Conduct a web search with your questions, making sure to use your networking tools. Optional sources include but are not limited to:\n1. View papers on Arxiv (HTML or PDF). Or use webfetch/GoogleSearch. Explain the inspiration combining with the original text.\n2. Look for discussions in online communities.\n3. Check GitHub for relevant repositories and explain the inspiration combining with the repository code.\n\nTask:\n1. After detailed analysis and research, provide your plan to guide future LLM experiments. Do not repeat previous ideas.\n2. Write your plan to the key named 'hint' in ./history.json, ur plan must have a short reference to real online source (paper text,online discussion,or github original code) so that I can trace back.\n"
+        "user_template": "{DEFAULT_SYS}\nPrevious experiment records:\n{meta_lessons}\nPrevious web hint:\n{hint}\nresult plot: {plot_names}\n\nHuman: now, the current experiments have failed to achieve a breakthrough. Analyze the code in the current working directory and the history. Conduct a web search with your questions, making sure to use your networking tools. Optional sources include but are not limited to:\n1. View papers on Arxiv (HTML or PDF). Or use webfetch/GoogleSearch. Explain the inspiration combining with the original text.\n2. Look for discussions in online communities.\n3. Check GitHub for relevant repositories and explain the inspiration combining with the repository code.\n\nTask:\n1. Do detailed analysis and web research. \n2. Write a brainstorm text to guide future LLM experiments, ur plan must have a short reference to real online source (paper text,online discussion,or github original code) so that I can trace back. Do not repeat previous ideas.\n"
       },
       "id": "meta_analysis_llm",
-      "label": "Meta Analysis LLM",
+      "label": "Hint generation LLM",
       "position": {
-        "x": 1400,
-        "y": 600
+        "x": 1313,
+        "y": 659
       },
       "type": "llm_generate"
     },
@@ -762,10 +778,37 @@
       "id": "reset_fail_count",
       "label": "Reset Fail Count",
       "position": {
-        "x": 1600,
-        "y": 600
+        "x": 1589,
+        "y": 643
       },
       "type": "python_script"
+    },
+    {
+      "config": {
+        "code": "val = context.get('hint_output', '')\nstr_len = 6000\nhalf_len = 3000\nif isinstance(val, str) and len(val) > str_len:\n    context['hint_output'] = val[:half_len] + '...[TRUNCATED]...' + val[-half_len:]\n    logger.log(f\"Trimmed 'hint_output' from {len(val)} to {len(context['hint_output'])} chars\")\n"
+      },
+      "id": "n_1766633725413",
+      "label": "Trim hint",
+      "position": {
+        "x": 1315,
+        "y": 906
+      },
+      "type": "python_script"
+    },
+    {
+      "config": {
+        "key": "hint",
+        "mode": "overwrite",
+        "value_template": "{hint_output}",
+        "value_type": "string"
+      },
+      "id": "n_1766633914418",
+      "label": "write hint",
+      "position": {
+        "x": 1542,
+        "y": 919
+      },
+      "type": "write_history"
     }
   ]
 }
