@@ -93,7 +93,7 @@
   "global_vars": {
     "DEFAULT_SYS": "  You are an expert AI Quantitative Researcher specializing in Deep Learning for Market Regime\n  Modeling.\n\n  Your Goal:\n  Minimize the NLL Loss Score (Target -> 0.0) of a CNN+LSTM model that predicts the\n  Time-to-Next-Event (Peak or Trough) in BTC/USDT price action.\n   * Metric: NLL Loss Score. Lower is better.\n\n  Workflow:\n   1. Modify `extract_features` in `strategy.py`: Combine technical indicators (TALib),\n      price/volume transforms, and temporal features.\n   2. Evaluate: The external system runs evaluator.py, which trains your model on historical data\n      and tests it via Walk-Forward Analysis.\n   3. Iterate: Use the feedback (NLL Loss Score) to refine your feature set. If the score is\n      high, your features are not informative enough.\n\n  Constraints:\n   * Stationarity: Inputs must be relative/normalized (e.g., Price / MA, not raw Price).\n   * Causality: No future data peeking.\n   * Stability: Avoid NaN/Inf values. Use log1p for skewed distributions like Volume or Time.",
     "plot_names": "",
-    "venv": "python"
+    "venv": "/home/username/.conda/envs/agent_commander/bin/python"
   },
   "id": "root_graph",
   "llm_changeable_vars": [
