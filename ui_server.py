@@ -407,29 +407,60 @@ def scan_directory(path):
 
 @app.route('/api/files', methods=['GET'])
 def list_files_api():
-    rel_path = request.args.get('path', '')
-    target_path = Path(CURRENT_ROOT_DIR) / rel_path
+    path_param = request.args.get('path', '')
     
-    # Security check (basic)
-    try:
-        target_path = target_path.resolve()
-        root_path = Path(CURRENT_ROOT_DIR).resolve()
-        if root_path not in target_path.parents and target_path != root_path:
-             return jsonify({"error": "Access denied"}), 403
-    except:
-        return jsonify({"error": "Invalid path"}), 400
+    # 1. Determine target path
+    if path_param == '':
+        target_path = Path(CURRENT_ROOT_DIR)
+    else:
+        p_param = Path(path_param)
+        p_root = Path(CURRENT_ROOT_DIR)
+        
+        # If absolute, use as is (pathlib / operator does this, but explicit logic is clearer)
+        if p_param.is_absolute():
+            target_path = p_param
+        # If it matches root or starts with root (naive string check for relative paths)
+        elif str(p_param) == str(p_root) or str(p_param).startswith(str(p_root) + os.sep):
+            target_path = p_param
+        else:
+            # Assume it is a sub-path relative to root
+            target_path = p_root / path_param
 
-    if rel_path == '':
-        # Root request: Return tree structure wrapper
+    # 2. Security & Existence Check
+    try:
+        target_path_abs = target_path.resolve()
+        root_path_abs = Path(CURRENT_ROOT_DIR).resolve()
+        
+        # Security: Must be inside root or equal to root
+        if target_path_abs != root_path_abs and root_path_abs not in target_path_abs.parents:
+             return jsonify({"error": "Access denied"}), 403
+             
+        if not target_path.exists():
+             # Fallback: Maybe it WAS a relative path but our heuristic failed?
+             # Try forcing append one last time if we didn't already
+             retry_path = Path(CURRENT_ROOT_DIR) / path_param
+             if retry_path.exists() and retry_path.resolve() == target_path_abs:
+                 # It was the same path, really doesn't exist
+                 return jsonify({"error": f"Path not found: {target_path}"}), 404
+             elif retry_path.exists():
+                 # Oh, appending worked! Use that.
+                 target_path = retry_path
+             else:
+                 return jsonify({"error": f"Path not found: {target_path}"}), 404
+
+    except Exception as e:
+        return jsonify({"error": f"Invalid path resolution: {e}"}), 400
+
+    if path_param == '':
+        # Root request wrapper
         return jsonify({
-            "name": root_path.name,
+            "name": Path(CURRENT_ROOT_DIR).name,
             "type": "folder",
-            "path": str(root_path),
+            "path": str(Path(CURRENT_ROOT_DIR)),
             "rel_path": "",
             "children": scan_directory(target_path)
         })
     else:
-        # Subfolder request: Return list of children directly
         return jsonify(scan_directory(target_path))
 
 @app.route('/api/file_content', methods=['GET'])
