@@ -8,6 +8,7 @@ example/diabetes_sklearn/my_workflows/
 my_workflows/
 __pycache__/
 .ipynb_checkpoints/
+test_place/
 pylib/.cache/
 push.sh
 pull.sh
