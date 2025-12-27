@@ -255,14 +255,30 @@ class GraphExecutor:
         
         prompt = self.recursive_format(user_tmpl, context_vars)
         
-        # --- File Permission Constraints ---
+        # --- File Permission & Snapshot Logic ---
         perm_mode = cfg.get("file_permission_mode", "open")
-        target_files = cfg.get("target_files", "")
+        target_files_str = cfg.get("target_files", "")
         
+        # Normalize allowed paths
+        allowed_paths = []
+        if target_files_str:
+            allowed_paths = [Path(p.strip()) for p in target_files_str.split(',') if p.strip()]
+
+        cwd_path = Path(self.context.get("current_exp_path", self.service.tasks_dir))
+        if not cwd_path.exists(): cwd_path = self.service.tasks_dir
+        
+        snapshot_path = None
+
         if perm_mode == "whitelist":
             # Append strict constraint to the prompt
-            constraint_msg = f"\n\n[SYSTEM: CRITICAL FILE PERMISSION CONSTRAINT]\nYou are strictly allowed to modify ONLY the following files: [{target_files}].\nDo NOT modify or create any other files. Violating this is a critical error."
+            constraint_msg = f"\n\n[SYSTEM: CRITICAL FILE PERMISSION CONSTRAINT]\nYou are strictly allowed to modify ONLY the following files/folders: [{target_files_str}].\nDo NOT modify or create any other files. Violating this is a critical error."
             prompt += constraint_msg
+            
+            # Create Snapshot
+            snapshot_path = cwd_path.parent / (cwd_path.name + "_snapshot")
+            if snapshot_path.exists(): shutil.rmtree(snapshot_path)
+            shutil.copytree(cwd_path, snapshot_path)
+            # self.logger.log(f"📸 Created security snapshot at {snapshot_path}")
         
         # Determine Session ID
         session_mode = cfg.get("session_mode", "new") # new / inherit
@@ -286,17 +302,10 @@ class GraphExecutor:
         response = ""
         new_session_id = None
         
-        # --- Backup History ---
+        # --- Backup History (Legacy variable logic, still useful for context) ---
         path_str = self.context.get("current_exp_path", self.service.tasks_dir)
         path = Path(path_str)
-        old_hist = json_history.load_history(path) if path.exists() else {}
-
-        # Determine CWD for the LLM process
-        # This ensures that if the LLM uses tools like 'ls' or 'write_file' with relative paths,
-        # they act within the experiment directory.
-        cwd_path = Path(self.context.get("current_exp_path", self.service.tasks_dir))
-        if not cwd_path.exists():
-            cwd_path = self.service.tasks_dir
+        # old_hist = json_history.load_history(path) if path.exists() else {}
 
         self.logger.log(f"      🗣️  LLM Call ({model}, {session_mode}) in {cwd_path}...")
         
@@ -323,28 +332,73 @@ class GraphExecutor:
             except Exception as e: self.logger.error(str(e))
         else:
             try:
-                # For Gemini/Other, llm_client.call_gemini doesn't currently accept cwd.
-                # We might need to update llm_client if we want parity, but for now focusing on claude-cli as requested.
-                # Assuming llm_client handles its own process.
                 response, new_session_id = llm_client.call_gemini(prompt, session_id, timeout=timeout, model=model, cwd=str(cwd_path))
             except Exception as e: self.logger.error(str(e))
             
         self.context["last_response"] = response
         
-        # --- Sanitize History ---
-        if path.exists():
-            new_hist = json_history.load_history(path)
-            sanitized_hist = {}
-            sanitized_hist.update(new_hist)
-            
-            sanitized_hist = new_hist
-            
-            json_history.save_history(path, sanitized_hist)
-            
-            # Reload vars into context (Load everything? Or just what we need? 
-            # For now, let's load everything from history to context to reflect changes)
-            for k, v in sanitized_hist.items():
-                self.context[k] = v
+        # --- Restore / Enforce File Permissions ---
+        if perm_mode == "whitelist" and snapshot_path and snapshot_path.exists():
+            def is_allowed(target_p):
+                # Check if target_p (relative to cwd) matches any allowed path
+                # allowed_paths are relative strings like "strategy.py" or "lib"
+                # target_p is a Path object relative to cwd
+                for allowed in allowed_paths:
+                    # Check exact match
+                    if target_p == allowed: return True
+                    # Check if target_p is inside allowed folder (e.g. allowed="lib", target="lib/utils.py")
+                    try:
+                        target_p.relative_to(allowed)
+                        return True # It is inside
+                    except ValueError:
+                        continue
+                return False
+
+            # 1. Check for NEW or MODIFIED files
+            for current_file in cwd_path.rglob('*'):
+                if current_file.is_dir(): continue
+                if current_file.name == 'history.json': continue # Always allow history
+                
+                try:
+                    rel_path = current_file.relative_to(cwd_path)
+                except: continue # Should not happen with rglob
+                
+                snap_file = snapshot_path / rel_path
+                
+                if not is_allowed(rel_path):
+                    if not snap_file.exists():
+                        # New unauthorized file
+                        self.logger.log(f"🛡️ Security: Deleting unauthorized file {rel_path}")
+                        try: current_file.unlink()
+                        except: pass
+                    else:
+                        # Modified unauthorized file?
+                        # Read bytes to compare
+                        try:
+                            if current_file.read_bytes() != snap_file.read_bytes():
+                                self.logger.log(f"🛡️ Security: Reverting unauthorized change to {rel_path}")
+                                shutil.copy2(snap_file, current_file)
+                        except: pass
+
+            # 2. Check for DELETED files
+            for snap_file in snapshot_path.rglob('*'):
+                if snap_file.is_dir(): continue
+                rel_path = snap_file.relative_to(snapshot_path)
+                if rel_path.name == 'history.json': continue
+
+                current_file = cwd_path / rel_path
+                
+                if not current_file.exists():
+                    if not is_allowed(rel_path):
+                        self.logger.log(f"🛡️ Security: Restoring deleted file {rel_path}")
+                        try:
+                            current_file.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(snap_file, current_file)
+                        except: pass
+
+            # Cleanup
+            try: shutil.rmtree(snapshot_path)
+            except: pass
 
         # --- Update Context with Outputs ---
         if response_var:
@@ -354,7 +408,8 @@ class GraphExecutor:
             self.context[session_id_output_var] = new_session_id
                 
         # --- Restore Root Files ---
-        self.service.restore_root_files()
+        # User requested to CANCEL root monitoring for this logic
+        # self.service.restore_root_files()
 
     def _step_shell(self, node):
         cfg = node.get("config", {})
