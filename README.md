@@ -148,9 +148,18 @@ The `config.json` file controls the core behavior of the agent system. You can m
 *   **root_dir**: The working directory where experiments and data are stored.
 *   **n_cycles**: The number of experiment iterations to run.
 *   **global_vars**: These are hardcoded environment variables (e.g., API keys, system paths) accessible throughout the workflow.
-*   **llm_changeable_vars**: A list of variable names that the LLM is explicitly allowed to modify during runtime. These often represent hyperparameters or learned parameters.
 *   **workflow**: The workflow definition graph. Can be a full JSON object or a string path to a separate JSON file (e.g., `"my_workflows/workflow_v1.json"`).
 *   **Shared Context**: All nodes in the workflow exchange data through a shared variable pool, known as the `context`. This allows for flexible data flow between different modules without strict parameter passing.
+
+### File Permission Modes (LLM Nodes)
+To prevent LLM agents from modifying unauthorized files, AgentCommander implements a strict **File Permission System** for each `llm_generate` node:
+
+*   **Strict (Read-Only) [Default for New Nodes]**: The LLM is strictly forbidden from creating or modifying *any* files. It can only read files and output its response to the context.
+*   **Restricted (Whitelist Only)**: The LLM can only modify the files or folders explicitly listed in the configuration (e.g., `strategy.py`, `lib/`).
+*   **Open (Allow All)**: The LLM has unrestricted access to modify files within the working directory.
+
+**Enforcement Mechanism**:
+For "Strict" and "Restricted" modes, the system creates a **filesystem snapshot** of the experiment directory before the LLM executes. After execution, it compares the directory state with the snapshot. Any unauthorized changes (modifications, creations, or deletions) are immediately **reverted** to maintain integrity. A strict system instruction is also injected into the prompt to warn the LLM.
 
 ## Tips & Best Practices
 

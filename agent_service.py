@@ -256,12 +256,12 @@ class GraphExecutor:
         prompt = self.recursive_format(user_tmpl, context_vars)
         
         # --- File Permission & Snapshot Logic ---
-        perm_mode = cfg.get("file_permission_mode", "open")
+        perm_mode = cfg.get("file_permission_mode", "open") # Default to open for backward compat
         target_files_str = cfg.get("target_files", "")
         
         # Normalize allowed paths
         allowed_paths = []
-        if target_files_str:
+        if perm_mode == "whitelist" and target_files_str:
             allowed_paths = [Path(p.strip()) for p in target_files_str.split(',') if p.strip()]
 
         cwd_path = Path(self.context.get("current_exp_path", self.service.tasks_dir))
@@ -278,7 +278,16 @@ class GraphExecutor:
             snapshot_path = cwd_path.parent / (cwd_path.name + "_snapshot")
             if snapshot_path.exists(): shutil.rmtree(snapshot_path)
             shutil.copytree(cwd_path, snapshot_path)
-            # self.logger.log(f"📸 Created security snapshot at {snapshot_path}")
+            
+        elif perm_mode == "forbid":
+            # Strict Read-Only
+            constraint_msg = f"\n\n[SYSTEM: STRICT READ-ONLY MODE]\nYou are NOT allowed to modify or create ANY files. You may only read files and output your response.\nViolating this is a critical error."
+            prompt += constraint_msg
+            
+            # Create Snapshot
+            snapshot_path = cwd_path.parent / (cwd_path.name + "_snapshot")
+            if snapshot_path.exists(): shutil.rmtree(snapshot_path)
+            shutil.copytree(cwd_path, snapshot_path)
         
         # Determine Session ID
         session_mode = cfg.get("session_mode", "new") # new / inherit
@@ -338,7 +347,7 @@ class GraphExecutor:
         self.context["last_response"] = response
         
         # --- Restore / Enforce File Permissions ---
-        if perm_mode == "whitelist" and snapshot_path and snapshot_path.exists():
+        if (perm_mode == "whitelist" or perm_mode == "forbid") and snapshot_path and snapshot_path.exists():
             def is_allowed(target_p):
                 # Check if target_p (relative to cwd) matches any allowed path
                 # allowed_paths are relative strings like "strategy.py" or "lib"

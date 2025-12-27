@@ -264,6 +264,7 @@
             },
             {
               "config": {
+                "file_permission_mode": "forbid",
                 "model": "auto-gemini-3",
                 "response_output": "hypothesis_output",
                 "session_id_output": "session_v1",
@@ -380,6 +381,7 @@
             },
             {
               "config": {
+                "file_permission_mode": "forbid",
                 "model": "auto-gemini-3",
                 "response_output": "supervisor_log",
                 "session_id_input": "session_v1",
@@ -419,6 +421,8 @@
             },
             {
               "config": {
+                "file_permission_mode": "whitelist",
+                "target_files": "strategy.py",
                 "model": "gemini-3-flash-preview",
                 "response_output": "llm_response",
                 "session_id_input": "session_v1",
@@ -476,6 +480,8 @@
             },
             {
               "config": {
+                "file_permission_mode": "whitelist",
+                "target_files": "strategy.py",
                 "model": "gemini-3-flash-preview",
                 "response_output": "correction_log",
                 "session_id_input": "session_v1",
@@ -507,6 +513,7 @@
             },
             {
               "config": {
+                "file_permission_mode": "forbid",
                 "model": "gemini-3-flash-preview",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
@@ -524,6 +531,7 @@
             },
             {
               "config": {
+                "file_permission_mode": "forbid",
                 "model": "gemini-3-flash-preview",
                 "response_output": "result_analysis",
                 "session_id_input": "session_v1",
@@ -744,10 +752,10 @@
       "type": "lesson"
     },
     {
-      "config": {
-        "model": "auto-gemini-3",
-        "response_output": "hint_output",
-        "session_id_input": "gemini_session_id",
+                    "config": {
+                      "file_permission_mode": "forbid",
+                      "model": "auto-gemini-3",
+                      "response_output": "hint_output",        "session_id_input": "gemini_session_id",
         "session_mode": "inherit",
         "timeout": 1200,
         "user_template": "{DEFAULT_SYS}\nPrevious experiment records:\n{meta_lessons}\nPrevious web hint:\n{hint}\nresult plot: {plot_names}\n\nHuman: now, the current experiments have failed to achieve a breakthrough. Analyze the code in the current working directory and the history. Conduct a web search with your questions, making sure to use your networking tools. Optional sources include but are not limited to:\n1. View papers on Arxiv (HTML or PDF). Or use webfetch/GoogleSearch. Explain the inspiration combining with the original text.\n2. Look for discussions in online communities.\n3. Check GitHub for relevant repositories and explain the inspiration combining with the repository code.\n\nTask:\n1. Do detailed analysis and web research. \n2. Write a brainstorm text to guide future LLM experiments, ur plan must have a short reference to real online source (paper text,online discussion,or github original code) so that I can trace back. Do not repeat previous ideas.\n"

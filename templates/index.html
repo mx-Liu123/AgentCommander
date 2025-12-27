@@ -521,16 +521,16 @@
                     
                     <hr class="border-secondary">
                     <label class="mb-1 text-info">Session Management</label>
-                                                <label class="form-label mt-2 text-warning">File Permissions</label>
-                                                <select class="form-select mb-2" v-model="selectedNode.config.file_permission_mode">
-                                                    <option value="open">Open (Allow All)</option>
-                                                    <option value="whitelist">Restricted (Whitelist Only)</option>
-                                                </select>
-                                                <div v-if="selectedNode.config.file_permission_mode === 'whitelist'">
-                                                    <label class="form-label small text-muted">Allowed Files (comma separated)</label>
-                                                    <input type="text" class="form-control mb-2" v-model="selectedNode.config.target_files" placeholder="e.g. strategy.py, config.json">
-                                                </div>
-                    
+                                                                            <label class="form-label mt-2 text-warning">File Permissions</label>
+                                                                            <select class="form-select mb-2" v-model="selectedNode.config.file_permission_mode">
+                                                                                <option value="forbid">Strict (Read-Only)</option>
+                                                                                <option value="whitelist">Restricted (Whitelist Only)</option>
+                                                                                <option value="open">Open (Allow All)</option>
+                                                                            </select>
+                                                                            <div v-if="selectedNode.config.file_permission_mode === 'whitelist'">
+                                                                                <label class="form-label small text-muted">Allowed Files (comma separated)</label>
+                                                                                <input type="text" class="form-control mb-2" v-model="selectedNode.config.target_files" placeholder="e.g. strategy.py, config.json">
+                                                                            </div>                    
                                                 <label class="form-label mt-2">Session Mode</label>
                                                 <select class="form-select mb-3" v-model="selectedNode.config.session_mode">                        <option value="new">Start New Session</option>
                         <option value="inherit">Inherit Session</option>
