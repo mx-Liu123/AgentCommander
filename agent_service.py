@@ -255,6 +255,15 @@ class GraphExecutor:
         
         prompt = self.recursive_format(user_tmpl, context_vars)
         
+        # --- File Permission Constraints ---
+        perm_mode = cfg.get("file_permission_mode", "open")
+        target_files = cfg.get("target_files", "")
+        
+        if perm_mode == "whitelist":
+            # Append strict constraint to the prompt
+            constraint_msg = f"\n\n[SYSTEM: CRITICAL FILE PERMISSION CONSTRAINT]\nYou are strictly allowed to modify ONLY the following files: [{target_files}].\nDo NOT modify or create any other files. Violating this is a critical error."
+            prompt += constraint_msg
+        
         # Determine Session ID
         session_mode = cfg.get("session_mode", "new") # new / inherit
         session_id_input_var = cfg.get("session_id_input", "")
@@ -328,25 +337,14 @@ class GraphExecutor:
             sanitized_hist = {}
             sanitized_hist.update(new_hist)
             
-            changeable_vars = self.service.config.get("llm_changeable_vars", [])
-            special_keys = ['gemini_session_id', 'claude_session_id']
-            
-            # Restore protected vars
-            for k, v in old_hist.items():
-                if k not in changeable_vars and k not in special_keys:
-                    if new_hist.get(k) != v:
-                        sanitized_hist[k] = v
-                        
-            # Remove unauthorized new vars
-            for k in list(sanitized_hist.keys()):
-                if k not in old_hist and k not in changeable_vars and k not in special_keys:
-                    del sanitized_hist[k]
+            sanitized_hist = new_hist
             
             json_history.save_history(path, sanitized_hist)
             
-            # Reload allowed vars into context
-            for k in changeable_vars:
-                if k in sanitized_hist: self.context[k] = sanitized_hist[k]
+            # Reload vars into context (Load everything? Or just what we need? 
+            # For now, let's load everything from history to context to reflect changes)
+            for k, v in sanitized_hist.items():
+                self.context[k] = v
 
         # --- Update Context with Outputs ---
         if response_var:

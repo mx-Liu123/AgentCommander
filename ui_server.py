@@ -91,14 +91,6 @@ def load_config():
             "plot_names": "",
             "venv": "/home/username/.conda/envs/agent_commander/bin/python"
         },
-        "llm_changeable_vars": [
-            "hypothesis",
-            "exp_design",
-            "result_analysis",
-            "hint"
-        ],
-        "mode": "new",
-        "resume_branch_id": "",
         "workflow": "pylib/.cache/current_graph.json"
     }
     try:
@@ -171,9 +163,7 @@ def get_config():
         "root_dir": CURRENT_ROOT_DIR,
         "branches": get_branches(CURRENT_ROOT_DIR),
         "global_vars": conf.get('global_vars', {}),
-        "llm_changeable_vars": conf.get('llm_changeable_vars', []),
-        "n_cycles": conf.get('n_cycles', 1),
-        "port": conf.get('port', 8080)
+        "workflow": conf.get('workflow', "pylib/default_graph.json")
     })
     return jsonify(response)
 

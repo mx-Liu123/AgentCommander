@@ -7,12 +7,6 @@
     "plot_names": "",
     "venv": "/home/username/.conda/envs/agent_commander/bin/python"
   },
-  "llm_changeable_vars": [
-    "hypothesis",
-    "exp_design",
-    "result_analysis",
-    "hint"
-  ],
   "mode": "new",
   "resume_branch_id": "",
   "workflow": "pylib/.cache/current_graph.json"

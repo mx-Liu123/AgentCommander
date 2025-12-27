@@ -198,10 +198,7 @@
                                     </div>
                                 </div>
                                 
-                                <div class="mt-3">
-                                    <h6>LLM Changeable Vars</h6>
-                                    <input type="text" class="form-control" :value="config.llm_changeable_vars ? config.llm_changeable_vars.join(', ') : ''" @input="updateChangeableVars">
-                                </div>
+
                             </div>
 
                             <div class="mt-3" id="tour-cp-actions">
@@ -524,8 +521,18 @@
                     
                     <hr class="border-secondary">
                     <label class="mb-1 text-info">Session Management</label>
-                    <select class="form-select mb-3" v-model="selectedNode.config.session_mode">
-                        <option value="new">Start New Session</option>
+                                                <label class="form-label mt-2 text-warning">File Permissions</label>
+                                                <select class="form-select mb-2" v-model="selectedNode.config.file_permission_mode">
+                                                    <option value="open">Open (Allow All)</option>
+                                                    <option value="whitelist">Restricted (Whitelist Only)</option>
+                                                </select>
+                                                <div v-if="selectedNode.config.file_permission_mode === 'whitelist'">
+                                                    <label class="form-label small text-muted">Allowed Files (comma separated)</label>
+                                                    <input type="text" class="form-control mb-2" v-model="selectedNode.config.target_files" placeholder="e.g. strategy.py, config.json">
+                                                </div>
+                    
+                                                <label class="form-label mt-2">Session Mode</label>
+                                                <select class="form-select mb-3" v-model="selectedNode.config.session_mode">                        <option value="new">Start New Session</option>
                         <option value="inherit">Inherit Session</option>
                     </select>
 
@@ -703,7 +710,7 @@
                 
                 const config = ref({
                     mode: 'new', resume_branch_id: '', n_cycles: 1, 
-                    global_vars: {}, llm_changeable_vars: [], workflow: {}
+                    global_vars: {}, workflow: {}
                 });
 
                 // Graph Editor State
@@ -733,7 +740,7 @@
                             
                             // Full config sync
                             if (data.global_vars) config.value.global_vars = data.global_vars;
-                            if (data.llm_changeable_vars) config.value.llm_changeable_vars = data.llm_changeable_vars;
+
                             if (data.mode) config.value.mode = data.mode;
                             if (data.resume_branch_id) config.value.resume_branch_id = data.resume_branch_id;
                             if (data.n_cycles) config.value.n_cycles = data.n_cycles;
@@ -962,7 +969,7 @@
                         
                         // Handle Extra Config
                         if (data.global_vars) config.value.global_vars = data.global_vars;
-                        if (data.llm_changeable_vars) config.value.llm_changeable_vars = data.llm_changeable_vars;
+
 
                         graphStack.value = [{ graph: config.value.workflow, name: 'Main Loop' }];
                         currentGraph.value = config.value.workflow;
@@ -980,7 +987,7 @@
                     if (action === 'update' || action === 'save_as') {
                         body.content = config.value.workflow; 
                         body.global_vars = config.value.global_vars;
-                        body.llm_changeable_vars = config.value.llm_changeable_vars;
+
                     }
                     
                     const res = await fetch('/api/workflow', {
@@ -1258,7 +1265,7 @@
                     return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${currX} ${currY}`;
                 };
 
-                const updateChangeableVars = (e) => config.value.llm_changeable_vars = e.target.value.split(',').map(s=>s.trim()).filter(s=>s);
+
                 
                 const addGlobalVar = () => {
                     const key = `NEW_VAR_${Date.now()}`;
@@ -1345,7 +1352,7 @@
                             explorerRoot.value = taskRoot.value;
                             
                             config.value.global_vars = newConf.global_vars || {};
-                            config.value.llm_changeable_vars = newConf.llm_changeable_vars || [];
+
                             config.value.n_cycles = newConf.n_cycles || 1;
                             
                             // Re-fetch branches as root might have changed
