@@ -457,31 +457,39 @@ def list_files_api():
 
 @app.route('/api/file_content', methods=['GET'])
 def get_file_content():
-    # Expects relative path from CURRENT_ROOT_DIR
-    rel_path = request.args.get('path')
-    if not rel_path: return jsonify({"error": "No path"}), 400
+    path_str = request.args.get('path')
+    if not path_str: return jsonify({"error": "Path required"}), 400
     
-    try:
-        full_path = (Path(CURRENT_ROOT_DIR) / rel_path).resolve()
-        print(f"DEBUG: Request content for {rel_path}")
-        print(f"DEBUG: Full path resolved to {full_path}")
-        
-        # Simple security check
-        if str(Path(CURRENT_ROOT_DIR).resolve()) not in str(full_path):
-             pass # In a real app, enforce jail. Here we trust user.
-        
-        if full_path.exists() and full_path.is_file():
-             # Check extension
-             suffix = full_path.suffix.lower()
-             if suffix in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']:
-                 import base64
-                 with open(full_path, 'rb') as f:
-                     encoded = base64.b64encode(f.read()).decode('utf-8')
-                     return jsonify({"content": encoded})
-             else:
-                 with open(full_path, 'r', encoding='utf-8', errors='replace') as f:
-                     return jsonify({"content": f.read()})
+    # Improved Path Resolution
+    p_param = Path(path_str)
+    p_root = Path(CURRENT_ROOT_DIR)
+    
+    full_path = None
+    
+    if p_param.is_absolute():
+        full_path = p_param.resolve()
+    elif str(p_param) == str(p_root) or str(p_param).startswith(str(p_root) + os.sep):
+        full_path = p_param.resolve()
+    else:
+        full_path = (p_root / p_param).resolve()
+    
+    print(f"DEBUG: Request content for {path_str}")
+    print(f"DEBUG: Full path resolved to {full_path}")
+    
+    # Security check
+    if str(Path(CURRENT_ROOT_DIR).resolve()) not in str(full_path):
+         return jsonify({"error": "Access denied"}), 403
+         
+    if not full_path.exists():
         return jsonify({"error": "File not found"}), 404
+        
+    # Read content
+    try:
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return jsonify({"content": content})
+    except UnicodeDecodeError:
+        return jsonify({"content": "[Binary or Non-UTF8 Content]"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
