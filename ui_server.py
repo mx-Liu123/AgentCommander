@@ -819,6 +819,8 @@ def copy_path_api():
             shutil.copy2(src_path, dest_path)
             
         return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     socketio.start_background_task(background_log_emitter)
