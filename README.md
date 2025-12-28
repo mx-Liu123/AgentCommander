@@ -107,7 +107,7 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
 To help you get started, the `example/diabetes_sklearn/` directory provides a reference implementation for organizing your machine learning experiments. This structure is designed to be robust and prevent "cheating" by the LLM.
 
 ### 1. File Organization
-*   **Root Evaluation Script (`evaluator.py`)**: Placed at the project root (e.g., `example/diabetes_sklearn/evaluator.py`), this file serves as the ground truth for assessment. It should be treated as **immutable** by the LLM. By keeping it outside the experiment's working directory, we prevent the agent from modifying the evaluation logic to artificially inflate scores.
+*   **Evaluation Script (`evaluator.py`)**: Placed within the experiment directory (e.g., `Branch_example/exp_example/evaluator.py`), this file serves as the ground truth for assessment. Since each experiment is self-contained, you can have different evaluation logic for different branches if needed. In strict mode, you should mark this file as read-only (default) or exclude it from the whitelist to prevent the agent from modifying it.
 *   **Seed Experiment Directory (`Branch_example/exp_example/`)**: This folder acts as the "seed" for your evolutionary tree. It contains the initial `strategy.py` (the model or logic to be improved) and any auxiliary files required for execution.
 *   **Experiment History (`history.json`)**: Within each experiment directory, `history.json` automatically stores all calculated metrics and the optimal results. The workflow can conveniently write key-value pairs into this file using the `write_history` module.
 
@@ -116,13 +116,12 @@ In the default workflow, the agent evaluates a strategy by running a shell comma
 
 ```bash
 cd {current_exp_path} && \
-export PYTHONPATH=$PYTHONPATH:../../ && \
 {venv} -c "from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))" > eval_out.txt 2>&1; \
 cat eval_out.txt
 ```
 
 *   **Isolation**: The command changes directory to the specific experiment folder (`{current_exp_path}`).
-*   **Context**: It adds the project root to `PYTHONPATH` so the local `strategy.py` can be imported by the root `evaluator.py`.
+*   **Context**: `evaluator.py` is present in the local directory, ensuring a self-contained execution environment.
 *   **Output**: All generated files (metrics, logs, artifacts) remain contained within the experiment directory, ensuring a clean workspace for every iteration.
 
 ### 3. Hyperparameter Search Pattern
@@ -152,14 +151,21 @@ The `config.json` file controls the core behavior of the agent system. You can m
 *   **Shared Context**: All nodes in the workflow exchange data through a shared variable pool, known as the `context`. This allows for flexible data flow between different modules without strict parameter passing.
 
 ### File Permission Modes (LLM Nodes)
-To prevent LLM agents from modifying unauthorized files, AgentCommander implements a strict **File Permission System** for each `llm_generate` node:
+To prevent LLM agents from modifying unauthorized files, AgentCommander implements a strict **File Permission System** for each `llm_generate` node. Each mode can also specify whether to `Allow Creating NEW Files`.
 
-*   **Strict (Read-Only) [Default for New Nodes]**: The LLM is strictly forbidden from creating or modifying *any* files. It can only read files and output its response to the context.
-*   **Restricted (Whitelist Only)**: The LLM can only modify the files or folders explicitly listed in the configuration (e.g., `strategy.py`, `lib/`).
-*   **Open (Allow All)**: The LLM has unrestricted access to modify files within the working directory.
+*   **Strict (Read-Only) [Default for New Nodes]**: The LLM is strictly forbidden from modifying existing files.
+    *   If `Allow Creating NEW Files` is **unchecked**: The LLM cannot create any new files.
+    *   If `Allow Creating NEW Files` is **checked**: The LLM can create new files, but cannot modify existing ones.
+*   **Restricted (Whitelist Only)**: The LLM can only modify the files or folders explicitly listed in the configuration (`target_files` - e.g., `strategy.py`, `lib/`).
+    *   If `Allow Creating NEW Files` is **unchecked**: The LLM can only create new files if their paths match the whitelist (i.e., new files are treated as existing files for modification purposes).
+    *   If `Allow Creating NEW Files` is **checked**: The LLM can create any new files, in addition to modifying whitelisted existing files.
+*   **Restricted (Blacklist)**: The LLM is forbidden from modifying or creating files/folders explicitly listed in the configuration (`target_files`). All other files/folders are editable.
+    *   If `Allow Creating NEW Files` is **unchecked**: The LLM cannot create any new files (unless they are explicitly whitelisted, which is not typical for blacklist mode). This option essentially means no new files are allowed globally, overriding the blacklist's default "allow everything else" behavior for new files.
+    *   If `Allow Creating NEW Files` is **checked**: The LLM can create new files, provided they are not on the blacklist.
+*   **Open (Allow All)**: The LLM has unrestricted access to modify and create files within the working directory. (`Allow Creating NEW Files` option has no effect in this mode, as it's implicitly allowed).
 
 **Enforcement Mechanism**:
-For "Strict" and "Restricted" modes, the system creates a **filesystem snapshot** of the experiment directory before the LLM executes. After execution, it compares the directory state with the snapshot. Any unauthorized changes (modifications, creations, or deletions) are immediately **reverted** to maintain integrity. A strict system instruction is also injected into the prompt to warn the LLM.
+For "Strict", "Restricted (Whitelist)", and "Restricted (Blacklist)" modes, the system creates a **filesystem snapshot** of the experiment directory before the LLM executes. After execution, it compares the directory state with the snapshot. Any unauthorized changes (modifications, creations, or deletions) are immediately **reverted** to maintain integrity. A strict system instruction is also injected into the prompt to warn the LLM about the current file permission constraints.
 
 ## Tips & Best Practices
 

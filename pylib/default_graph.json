@@ -156,19 +156,6 @@
               "target": "step7_save_imp"
             },
             {
-              "source": "step7_save_imp",
-              "target": "step8_check_threshold"
-            },
-            {
-              "label": "true",
-              "source": "step8_check_threshold",
-              "target": "step9_supervisor"
-            },
-            {
-              "source": "step9_supervisor",
-              "target": "step10_reload_status"
-            },
-            {
               "label": null,
               "source": "n_1766207472527",
               "target": "n_1766207420852"
@@ -199,16 +186,6 @@
             {
               "source": "step5_3_inc_trial",
               "target": "step4_eval"
-            },
-            {
-              "label": null,
-              "source": "step10_reload_status",
-              "target": "n_1766216815818"
-            },
-            {
-              "label": "false",
-              "source": "step8_check_threshold",
-              "target": "n_1766216815818"
             },
             {
               "label": null,
@@ -249,6 +226,11 @@
               "label": null,
               "source": "trim_result_analysis",
               "target": "n_1766217087160"
+            },
+            {
+              "label": null,
+              "source": "step7_save_imp",
+              "target": "n_1766216815818"
             }
           ],
           "nodes": [
@@ -257,8 +239,8 @@
               "id": "sub_start",
               "label": "Sub Start",
               "position": {
-                "x": -789,
-                "y": 104
+                "x": -817,
+                "y": 136
               },
               "type": "start"
             },
@@ -297,7 +279,7 @@
             },
             {
               "config": {
-                "command": "cd {current_exp_path} && export PYTHONPATH=$PYTHONPATH:../../ && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\" > eval_out.txt 2>&1; cat eval_out.txt",
+                "command": "cd {current_exp_path} && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\" > eval_out.txt 2>&1; cat eval_out.txt",
                 "output_vars": [
                   "test_output"
                 ],
@@ -347,8 +329,8 @@
               "id": "step6_save_metric",
               "label": "6. Save Metric",
               "position": {
-                "x": 1559,
-                "y": 60
+                "x": 1634,
+                "y": 354
               },
               "type": "write_history"
             },
@@ -362,72 +344,30 @@
               "id": "step7_save_imp",
               "label": "7. Save Improvement",
               "position": {
-                "x": 1690,
-                "y": 312
+                "x": 1942,
+                "y": 359
               },
               "type": "write_history"
-            },
-            {
-              "config": {
-                "code": "improved = context.get('is_improved', False)\npm = context.get('parent_metric')\ncm = context.get('current_metric')\nresult = False\nif improved and pm and cm and isinstance(pm, (int, float)) and isinstance(cm, (int, float)) and pm != 0:\n    imp_pct = (pm - cm) / abs(pm)\n    if imp_pct > 0.05:\n        result = True\n        logger.log(f\"\ud83d\udc6e Supervisor Triggered: Improvement {imp_pct:.2%} > 5%\")"
-              },
-              "id": "step8_check_threshold",
-              "label": "Improvement > 5%?",
-              "position": {
-                "x": 1914,
-                "y": 46
-              },
-              "type": "condition_code"
-            },
-            {
-              "config": {
-                "file_permission_mode": "forbid",
-                "model": "auto-gemini-3",
-                "response_output": "supervisor_log",
-                "session_id_input": "session_v1",
-                "session_mode": "inherit",
-                "timeout": 600,
-                "user_template": "{DEFAULT_SYS}\nnow we just have a breakthrough, you need to check if this breakthrough is reliable.\ntask1:\nMainly by checking if the images are normal: {plot_names}. If not normal, analyze the reason.\ntask2:\nBased on your analysis, update ./history.json key 'supervisor comment', 'if_improved'. If this breakthrough is achieved by cheating (manipulating evaluation standards or significantly adjusting the number of high/low points), or is not reliable, then you must change 'if_improved'=False."
-              },
-              "id": "step9_supervisor",
-              "label": "Supervisor Check",
-              "position": {
-                "x": 2168,
-                "y": -72
-              },
-              "type": "llm_generate"
-            },
-            {
-              "config": {
-                "code": "import json\ntry:\n    with open(context['current_exp_path'] + '/history.json', 'r') as f:\n        h = json.load(f)\n        if 'if_improved' in h:\n            context['is_improved'] = h['if_improved']\n            logger.log(f\"\ud83d\udc6e Supervisor Status Reload: is_improved={context['is_improved']}\")\nexcept: pass"
-              },
-              "id": "step10_reload_status",
-              "label": "Reload Status",
-              "position": {
-                "x": 2409,
-                "y": 11
-              },
-              "type": "python_script"
             },
             {
               "config": {},
               "id": "sub_end",
               "label": "Sub End",
               "position": {
-                "x": 2929,
-                "y": 264
+                "x": 2938,
+                "y": 395
               },
               "type": "end"
             },
             {
               "config": {
                 "file_permission_mode": "whitelist",
-                "target_files": "strategy.py",
                 "model": "gemini-3-flash-preview",
                 "response_output": "llm_response",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
                 "session_mode": "inherit",
+                "target_files": "strategy.py",
                 "timeout": 600,
                 "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nHuman Instructions:\nstep1: Modify strategy code (*.py) to implement ur hypothesis. You are encouraged to add/remove print statements for intermediate variables to clarify the research process. But u should try to reduce the warnning output or repetitive output because they will distract u from important variables.\n\nNote that u not need to run code. I will run export PYTHONPATH=$PYTHONPATH:../../ && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\" > eval_out.txt 2>&1; cat eval_out.txt later\n"
               },
@@ -461,8 +401,8 @@
               "id": "step3_init_vars",
               "label": "3. Init Correction Vars",
               "position": {
-                "x": 377,
-                "y": 228
+                "x": 393,
+                "y": 350
               },
               "type": "python_script"
             },
@@ -473,19 +413,19 @@
               "id": "step5_1_check_retry",
               "label": "5.1 Retry?",
               "position": {
-                "x": 1272,
-                "y": 173
+                "x": 1317,
+                "y": 358
               },
               "type": "condition_code"
             },
             {
               "config": {
                 "file_permission_mode": "whitelist",
-                "target_files": "strategy.py",
                 "model": "gemini-3-flash-preview",
                 "response_output": "correction_log",
                 "session_id_input": "session_v1",
                 "session_mode": "inherit",
+                "target_files": "strategy.py",
                 "timeout": 600,
                 "user_template": "{DEFAULT_SYS}\n\nThe previous attempt failed to improve the metric.\nCurrent Metric: {current_metric}\nParent Metric: {parent_metric}\nCorrection Trial: {correction_trials}/5\n\nEvaluator Output:\n{test_output}\n\nTask:\nAnalyze the failure and the evaluator output.\nModify 'strategy.py' to fix the issue or try a different approach to improve the metric.\nEnsure the code is valid and runnable."
               },
@@ -493,8 +433,8 @@
               "id": "step5_2_llm_fix",
               "label": "5.2 LLM Correction",
               "position": {
-                "x": 987,
-                "y": 178
+                "x": 975,
+                "y": 154
               },
               "type": "llm_generate"
             },
@@ -506,8 +446,8 @@
               "id": "step5_3_inc_trial",
               "label": "5.3 Inc Trial",
               "position": {
-                "x": 740,
-                "y": 182
+                "x": 700,
+                "y": 332
               },
               "type": "python_script"
             },
@@ -524,8 +464,8 @@
               "id": "n_1766216815818",
               "label": "experiment design",
               "position": {
-                "x": 2185,
-                "y": 371
+                "x": 2177,
+                "y": 141
               },
               "type": "llm_generate"
             },
@@ -543,8 +483,8 @@
               "id": "n_1766217006428",
               "label": "result analysis",
               "position": {
-                "x": 2459,
-                "y": 391
+                "x": 2483,
+                "y": 156
               },
               "type": "llm_generate"
             },
@@ -558,8 +498,8 @@
               "id": "n_1766217087160",
               "label": "write exp_design",
               "position": {
-                "x": 2696,
-                "y": 467
+                "x": 2759,
+                "y": 786
               },
               "type": "write_history"
             },
@@ -573,8 +513,8 @@
               "id": "n_1766217292294",
               "label": "write result_analysis",
               "position": {
-                "x": 2864,
-                "y": 565
+                "x": 3039,
+                "y": 798
               },
               "type": "write_history"
             },
@@ -752,10 +692,11 @@
       "type": "lesson"
     },
     {
-                    "config": {
-                      "file_permission_mode": "forbid",
-                      "model": "auto-gemini-3",
-                      "response_output": "hint_output",        "session_id_input": "gemini_session_id",
+      "config": {
+        "file_permission_mode": "forbid",
+        "model": "auto-gemini-3",
+        "response_output": "hint_output",
+        "session_id_input": "gemini_session_id",
         "session_mode": "inherit",
         "timeout": 1200,
         "user_template": "{DEFAULT_SYS}\nPrevious experiment records:\n{meta_lessons}\nPrevious web hint:\n{hint}\nresult plot: {plot_names}\n\nHuman: now, the current experiments have failed to achieve a breakthrough. Analyze the code in the current working directory and the history. Conduct a web search with your questions, making sure to use your networking tools. Optional sources include but are not limited to:\n1. View papers on Arxiv (HTML or PDF). Or use webfetch/GoogleSearch. Explain the inspiration combining with the original text.\n2. Look for discussions in online communities.\n3. Check GitHub for relevant repositories and explain the inspiration combining with the repository code.\n\nTask:\n1. Do detailed analysis and web research. \n2. Write a brainstorm text to guide future LLM experiments, ur plan must have a short reference to real online source (paper text,online discussion,or github original code) so that I can trace back. Do not repeat previous ideas.\n"

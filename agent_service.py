@@ -256,35 +256,42 @@ class GraphExecutor:
         prompt = self.recursive_format(user_tmpl, context_vars)
         
         # --- File Permission & Snapshot Logic ---
-        perm_mode = cfg.get("file_permission_mode", "open") # Default to open for backward compat
+        perm_mode = cfg.get("file_permission_mode", "open") # open, whitelist, blacklist, forbid
         target_files_str = cfg.get("target_files", "")
+        allow_new_files = cfg.get("allow_new_files", False)
         
-        # Normalize allowed paths
-        allowed_paths = []
-        if perm_mode == "whitelist" and target_files_str:
-            allowed_paths = [Path(p.strip()) for p in target_files_str.split(',') if p.strip()]
+        # Normalize allowed/blocked paths
+        target_paths = []
+        if perm_mode in ["whitelist", "blacklist"] and target_files_str:
+            target_paths = [Path(p.strip()) for p in target_files_str.split(',') if p.strip()]
 
         cwd_path = Path(self.context.get("current_exp_path", self.service.tasks_dir))
         if not cwd_path.exists(): cwd_path = self.service.tasks_dir
         
         snapshot_path = None
 
+        # System Prompt Injection
         if perm_mode == "whitelist":
-            # Append strict constraint to the prompt
-            constraint_msg = f"\n\n[SYSTEM: CRITICAL FILE PERMISSION CONSTRAINT]\nYou are strictly allowed to modify ONLY the following files/folders: [{target_files_str}].\nDo NOT modify or create any other files. Violating this is a critical error."
-            prompt += constraint_msg
+            msg = f"\n\n[SYSTEM: FILE PERMISSION]\nYou are allowed to modify ONLY the following files/folders: [{target_files_str}]."
+            if allow_new_files: msg += "\nYou are ALLOWED to create NEW files."
+            else: msg += "\nYou are NOT allowed to create new files (unless in the whitelist)."
+            msg += "\nViolating these rules will result in your changes being reverted."
+            prompt += msg
             
-            # Create Snapshot
-            snapshot_path = cwd_path.parent / (cwd_path.name + "_snapshot")
-            if snapshot_path.exists(): shutil.rmtree(snapshot_path)
-            shutil.copytree(cwd_path, snapshot_path)
-            
+        elif perm_mode == "blacklist":
+            msg = f"\n\n[SYSTEM: FILE PERMISSION]\nYou are FORBIDDEN from modifying or creating the following files/folders: [{target_files_str}]."
+            if allow_new_files: msg += "\nYou are ALLOWED to create other new files."
+            else: msg += "\nYou are NOT allowed to create any new files."
+            prompt += msg
+
         elif perm_mode == "forbid":
-            # Strict Read-Only
-            constraint_msg = f"\n\n[SYSTEM: STRICT READ-ONLY MODE]\nYou are NOT allowed to modify or create ANY files. You may only read files and output your response.\nViolating this is a critical error."
-            prompt += constraint_msg
+            msg = f"\n\n[SYSTEM: FILE PERMISSION]\nYou are operating in STRICT READ-ONLY mode for existing files."
+            if allow_new_files: msg += "\nHowever, you are ALLOWED to create NEW files."
+            else: msg += "\nYou are NOT allowed to create or modify ANY files."
+            prompt += msg
             
-            # Create Snapshot
+        # Create Snapshot if needed
+        if perm_mode in ["whitelist", "blacklist", "forbid"]:
             snapshot_path = cwd_path.parent / (cwd_path.name + "_snapshot")
             if snapshot_path.exists(): shutil.rmtree(snapshot_path)
             shutil.copytree(cwd_path, snapshot_path)
@@ -311,11 +318,6 @@ class GraphExecutor:
         response = ""
         new_session_id = None
         
-        # --- Backup History (Legacy variable logic, still useful for context) ---
-        path_str = self.context.get("current_exp_path", self.service.tasks_dir)
-        path = Path(path_str)
-        # old_hist = json_history.load_history(path) if path.exists() else {}
-
         self.logger.log(f"      🗣️  LLM Call ({model}, {session_mode}) in {cwd_path}...")
         
         if model == "claude-cli":
@@ -328,7 +330,6 @@ class GraphExecutor:
             ]
             if session_id: cmd.extend(["-r", session_id])
             try:
-                # Pass cwd to subprocess
                 res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(cwd_path))
                 if res.returncode == 0:
                     try:
@@ -347,41 +348,62 @@ class GraphExecutor:
         self.context["last_response"] = response
         
         # --- Restore / Enforce File Permissions ---
-        if (perm_mode == "whitelist" or perm_mode == "forbid") and snapshot_path and snapshot_path.exists():
+        if snapshot_path and snapshot_path.exists():
             def is_allowed(target_p):
-                # Check if target_p (relative to cwd) matches any allowed path
-                # allowed_paths are relative strings like "strategy.py" or "lib"
-                # target_p is a Path object relative to cwd
-                for allowed in allowed_paths:
-                    # Check exact match
-                    if target_p == allowed: return True
-                    # Check if target_p is inside allowed folder (e.g. allowed="lib", target="lib/utils.py")
-                    try:
-                        target_p.relative_to(allowed)
-                        return True # It is inside
-                    except ValueError:
-                        continue
+                # Returns True if the specific file is allowed by the RULES (Whitelist/Blacklist)
+                # Does NOT handle "Allow New" logic, that's handled in the loop.
+                if perm_mode == "open": return True
+                if perm_mode == "forbid": return False
+                
+                is_listed = False
+                for t in target_paths:
+                    if target_p == t: is_listed = True; break
+                    try: 
+                        target_p.relative_to(t)
+                        is_listed = True; break
+                    except: continue
+                
+                if perm_mode == "whitelist": return is_listed
+                if perm_mode == "blacklist": return not is_listed
                 return False
 
             # 1. Check for NEW or MODIFIED files
             for current_file in cwd_path.rglob('*'):
                 if current_file.is_dir(): continue
-                if current_file.name == 'history.json': continue # Always allow history
+                if current_file.name == 'history.json': continue 
                 
-                try:
-                    rel_path = current_file.relative_to(cwd_path)
-                except: continue # Should not happen with rglob
+                try: rel_path = current_file.relative_to(cwd_path)
+                except: continue
                 
                 snap_file = snapshot_path / rel_path
                 
-                if not is_allowed(rel_path):
-                    if not snap_file.exists():
-                        # New unauthorized file
-                        self.logger.log(f"🛡️ Security: Deleting unauthorized file {rel_path}")
+                is_new = not snap_file.exists()
+                
+                if is_new:
+                    should_delete = False
+                    
+                    if allow_new_files:
+                        # Generically Allowed. 
+                        # Exception: Blacklist mode blocks specific new files
+                        if perm_mode == "blacklist" and not is_allowed(rel_path):
+                            should_delete = True
+                    else:
+                        # Generically Blocked.
+                        # Exception: Whitelist mode allows specific new files
+                        if perm_mode == "whitelist" and is_allowed(rel_path):
+                            should_delete = False
+                        else:
+                            should_delete = True
+                            
+                    if should_delete:
+                        self.logger.log(f"🛡️ Security: Deleting unauthorized new file {rel_path}")
                         try: current_file.unlink()
                         except: pass
-                    else:
-                        # Modified unauthorized file?
+
+                else: # Modified Existing File
+                    # Must be allowed by mode logic (Whitelist/Blacklist/Strict)
+                    # "Allow New Files" does not affect existing files.
+                    if not is_allowed(rel_path):
                         # Read bytes to compare
                         try:
                             if current_file.read_bytes() != snap_file.read_bytes():
@@ -417,7 +439,6 @@ class GraphExecutor:
             self.context[session_id_output_var] = new_session_id
                 
         # --- Restore Root Files ---
-        # User requested to CANCEL root monitoring for this logic
         # self.service.restore_root_files()
 
     def _step_shell(self, node):

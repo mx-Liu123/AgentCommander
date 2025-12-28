@@ -172,6 +172,13 @@ def save_config_api():
     global CURRENT_ROOT_DIR # Moved to top
     try:
         new_conf = request.json
+        
+        # Sanitize: Ensure 'workflow' is a path string, not a full object
+        # This prevents config.json from becoming bloated with the entire graph
+        if 'workflow' in new_conf and isinstance(new_conf['workflow'], (dict, list)):
+            print("Warning: Attempted to save full workflow object to config.json. Ignoring 'workflow' field to preserve file path.")
+            del new_conf['workflow']
+
         # Merge with existing to avoid losing keys not sent
         current_conf = load_config()
         current_conf.update(new_conf)
@@ -248,6 +255,9 @@ def set_root():
     global CURRENT_ROOT_DIR
     data = request.json
     new_root = data.get('path')
+    
+    if not new_root: return jsonify({"error": "Path required"}), 400
+
     if os.path.exists(new_root):
         CURRENT_ROOT_DIR = new_root
         # Persist to config.json
@@ -256,10 +266,11 @@ def set_root():
             current_conf['root_dir'] = CURRENT_ROOT_DIR
             with open(CONFIG_FILE, 'w') as f:
                 json.dump(current_conf, f, indent=2)
-        except: pass
+        except Exception as e:
+            print(f"Error saving config.json: {e}")
         
         return jsonify({"status": "ok", "branches": get_branches(new_root)})
-    return jsonify({"error": "Path does not exist"}), 400
+    return jsonify({"error": f"Path does not exist: {new_root}"}), 400
 
 @app.route('/api/workflow', methods=['GET', 'POST'])
 def workflow_api():

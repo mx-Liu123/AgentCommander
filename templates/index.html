@@ -521,17 +521,27 @@
                     
                     <hr class="border-secondary">
                     <label class="mb-1 text-info">Session Management</label>
-                                                                            <label class="form-label mt-2 text-warning">File Permissions</label>
-                                                                            <select class="form-select mb-2" v-model="selectedNode.config.file_permission_mode">
-                                                                                <option value="forbid">Strict (Read-Only)</option>
-                                                                                <option value="whitelist">Restricted (Whitelist Only)</option>
-                                                                                <option value="open">Open (Allow All)</option>
-                                                                            </select>
-                                                                            <div v-if="selectedNode.config.file_permission_mode === 'whitelist'">
-                                                                                <label class="form-label small text-muted">Allowed Files (comma separated)</label>
-                                                                                <input type="text" class="form-control mb-2" v-model="selectedNode.config.target_files" placeholder="e.g. strategy.py, config.json">
-                                                                            </div>                    
-                                                <label class="form-label mt-2">Session Mode</label>
+                                                                                                                        <label class="form-label mt-2 text-warning">File Permissions</label>
+                                                                                                                        <select class="form-select mb-2" v-model="selectedNode.config.file_permission_mode">
+                                                                                                                            <option value="forbid">Strict (Read-Only)</option>
+                                                                                                                            <option value="whitelist">Restricted (Whitelist Only)</option>
+                                                                                                                            <option value="blacklist">Restricted (Blacklist)</option>
+                                                                                                                            <option value="open">Open (Allow All)</option>
+                                                                                                                        </select>
+                                                                                                                        
+                                                                                                                        <div v-if="['whitelist', 'blacklist'].includes(selectedNode.config.file_permission_mode)">
+                                                                                                                            <label class="form-label small text-muted">
+                                                                                                                                {{ selectedNode.config.file_permission_mode === 'whitelist' ? 'Allowed Files' : 'Blocked Files' }} (comma separated)
+                                                                                                                            </label>
+                                                                                                                            <input type="text" class="form-control mb-2" v-model="selectedNode.config.target_files" placeholder="e.g. strategy.py, config.json">
+                                                                                                                        </div>
+                                                                            
+                                                                                                                        <div v-if="selectedNode.config.file_permission_mode !== 'open'" class="form-check mb-3">
+                                                                                                                            <input class="form-check-input" type="checkbox" v-model="selectedNode.config.allow_new_files" id="chk-allow-new">
+                                                                                                                            <label class="form-check-label small text-light" for="chk-allow-new">
+                                                                                                                                Allow Creating NEW Files?
+                                                                                                                            </label>
+                                                                                                                        </div>                                                <label class="form-label mt-2">Session Mode</label>
                                                 <select class="form-select mb-3" v-model="selectedNode.config.session_mode">                        <option value="new">Start New Session</option>
                         <option value="inherit">Inherit Session</option>
                     </select>
@@ -963,16 +973,18 @@
                         const data = await res.json();
                         
                         // Handle Graph
-                        // If root object has 'nodes', use it directly. Else look for 'workflow' key.
-                        if (data.nodes) config.value.workflow = data;
-                        else if (data.workflow) config.value.workflow = data.workflow;
+                        let graphData = {};
+                        if (data.nodes) graphData = data;
+                        else if (data.workflow) graphData = data.workflow;
                         
                         // Handle Extra Config
                         if (data.global_vars) config.value.global_vars = data.global_vars;
 
-
-                        graphStack.value = [{ graph: config.value.workflow, name: 'Main Loop' }];
-                        currentGraph.value = config.value.workflow;
+                        // FIX: Do not overwrite config.value.workflow with object data
+                        // config.value.workflow should remain as the path string loaded from /api/config
+                        
+                        graphStack.value = [{ graph: graphData, name: 'Main Loop' }];
+                        currentGraph.value = graphData;
                         pan.value = {x: 0, y: 0};
                     }
                 };
@@ -1404,7 +1416,27 @@
                     await fetch(`/api/stop?type=${type}`, {method: 'POST'});
                 };
                 const updateTaskRoot = async () => {
-                    await fetch('/api/set_root', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path: taskRoot.value})});
+                    try {
+                        const res = await fetch('/api/set_root', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path: taskRoot.value})});
+                        if(res.ok) {
+                            alert("Root updated successfully!");
+                            // Refresh explorer if it was viewing the old root
+                            explorerRoot.value = taskRoot.value;
+                            await loadFiles();
+                            
+                            // Refresh branches
+                            const res2 = await fetch('/api/config');
+                            if(res2.ok) {
+                                const data2 = await res2.json();
+                                availableBranches.value = data2.branches;
+                            }
+                        } else {
+                            const data = await res.json();
+                            alert("Failed to update root: " + (data.error || 'Unknown error'));
+                        }
+                    } catch(e) {
+                        alert("Network error: " + e.message);
+                    }
                 };
                 const saveWorkflow = () => {
                      alert("Workflow saved to memory for current session.");
