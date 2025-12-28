@@ -611,7 +611,17 @@ def save_file_api():
         
         if not rel_path: return jsonify({"error": "No path provided"}), 400
         
-        full_path = (Path(CURRENT_ROOT_DIR) / rel_path).resolve()
+        # Improved Path Resolution
+        p_param = Path(rel_path)
+        p_root = Path(CURRENT_ROOT_DIR)
+        
+        full_path = None
+        if p_param.is_absolute():
+            full_path = p_param.resolve()
+        elif str(p_param) == str(p_root) or str(p_param).startswith(str(p_root) + os.sep):
+            full_path = p_param.resolve()
+        else:
+            full_path = (p_root / p_param).resolve()
         
         # Security check
         if str(Path(CURRENT_ROOT_DIR).resolve()) not in str(full_path):
@@ -702,7 +712,17 @@ def delete_path_api():
         rel_path = data.get('path')
         if not rel_path: return jsonify({"error": "Path required"}), 400
         
-        full_path = (Path(CURRENT_ROOT_DIR) / rel_path).resolve()
+        # Improved Path Resolution
+        p_param = Path(rel_path)
+        p_root = Path(CURRENT_ROOT_DIR)
+        
+        full_path = None
+        if p_param.is_absolute():
+            full_path = p_param.resolve()
+        elif str(p_param) == str(p_root) or str(p_param).startswith(str(p_root) + os.sep):
+            full_path = p_param.resolve()
+        else:
+            full_path = (p_root / p_param).resolve()
         
         # Security check
         if str(Path(CURRENT_ROOT_DIR).resolve()) not in str(full_path):
@@ -729,8 +749,19 @@ def rename_path_api():
         
         if not old_rel or not new_rel: return jsonify({"error": "Paths required"}), 400
         
-        old_path = (Path(CURRENT_ROOT_DIR) / old_rel).resolve()
-        new_path = (Path(CURRENT_ROOT_DIR) / new_rel).resolve()
+        p_root = Path(CURRENT_ROOT_DIR)
+
+        # Resolve Old
+        p_old = Path(old_rel)
+        if p_old.is_absolute(): old_path = p_old.resolve()
+        elif str(p_old) == str(p_root) or str(p_old).startswith(str(p_root) + os.sep): old_path = p_old.resolve()
+        else: old_path = (p_root / p_old).resolve()
+
+        # Resolve New
+        p_new = Path(new_rel)
+        if p_new.is_absolute(): new_path = p_new.resolve()
+        elif str(p_new) == str(p_root) or str(p_new).startswith(str(p_root) + os.sep): new_path = p_new.resolve()
+        else: new_path = (p_root / p_new).resolve()
         
         # Security check
         root_path = Path(CURRENT_ROOT_DIR).resolve()
@@ -757,8 +788,19 @@ def copy_path_api():
         
         if not src_rel or not dest_rel: return jsonify({"error": "Paths required"}), 400
         
-        src_path = (Path(CURRENT_ROOT_DIR) / src_rel).resolve()
-        dest_path = (Path(CURRENT_ROOT_DIR) / dest_rel).resolve()
+        p_root = Path(CURRENT_ROOT_DIR)
+
+        # Resolve Src
+        p_src = Path(src_rel)
+        if p_src.is_absolute(): src_path = p_src.resolve()
+        elif str(p_src) == str(p_root) or str(p_src).startswith(str(p_root) + os.sep): src_path = p_src.resolve()
+        else: src_path = (p_root / p_src).resolve()
+
+        # Resolve Dest
+        p_dest = Path(dest_rel)
+        if p_dest.is_absolute(): dest_path = p_dest.resolve()
+        elif str(p_dest) == str(p_root) or str(p_dest).startswith(str(p_root) + os.sep): dest_path = p_dest.resolve()
+        else: dest_path = (p_root / p_dest).resolve()
         
         # Security check
         root_path = Path(CURRENT_ROOT_DIR).resolve()
@@ -770,15 +812,13 @@ def copy_path_api():
             
         if dest_path.exists():
             return jsonify({"error": "Destination already exists"}), 400
-
+            
         if src_path.is_dir():
             shutil.copytree(src_path, dest_path)
         else:
             shutil.copy2(src_path, dest_path)
             
         return jsonify({"status": "ok"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     socketio.start_background_task(background_log_emitter)
