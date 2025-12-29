@@ -803,7 +803,7 @@
                             name: item.name, 
                             path: item.path,
                             isImage: isImg,
-                            content: 'Loading...',
+                            content: isImg ? '' : 'Loading...', # Empty for images to avoid 404 on src
                             editingNodeProp: null
                         };
                         saveStatus.value = '';
@@ -819,9 +819,14 @@
                                     if (ext === 'jpg' || ext === 'jpeg') mime = 'image/jpeg';
                                     else if (ext === 'svg') mime = 'image/svg+xml';
                                     
+                                    // Backend returns base64 for images
                                     previewFile.value.content = `data:${mime};base64,${data.content}`;
                                 } else {
-                                    previewFile.value.content = data.content;
+                                    if (data.encoding === 'base64') {
+                                        previewFile.value.content = "[Binary Content - View Not Supported]";
+                                    } else {
+                                        previewFile.value.content = data.content;
+                                    }
                                 }
                             } else {
                                 previewFile.value.content = "Error loading file.";

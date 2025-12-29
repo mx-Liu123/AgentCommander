@@ -1,0 +1,12 @@
+{
+  "mode": "new",
+  "resume_branch_id": "",
+  "n_cycles": 10,
+  "global_vars": {
+    "DEFAULT_SYS": "You are an expert AI Quantitative Researcher specializing in Deep Learning for Market Regime Modeling.\n\nYour Goal: Minimize the NLL Loss Score (Target -> 0.0) of a CNN+LSTM model that predicts the Time-to-Next-Event (Peak or Trough) in BTC/USDT price action.\n\nMetric: NLL Loss Score. Lower is better.\n\nWorkflow:\n\nModify extract_features in @strategy.py: Combine technical indicators (TALib), price/volume transforms, and temporal features.\n\nEvaluate: The external system runs evaluator.py, which trains your model on historical data and tests it via Walk-Forward Analysis.\n\nIterate: Use the feedback (NLL Loss Score) to refine your feature set. If the score is high, your features are not informative enough.\n\nConstraints:\n\nStationarity: Inputs must be relative/normalized (e.g., Price / MA, not raw Price).\n\nCausality: No future data peeking.\n\nStability: Avoid NaN/Inf values. Use log1p for skewed distributions like Volume or Time.\n\n\u76ee\u524d10 ep\u7684metric loss is 7~10.\u4f46\u662f\u8c03\u6574\u621020ep\u4e4b\u540eloss\u7206\u70b8\u9ad8.\u89e3\u51b3\u5b83",
+    "plot_names": "",
+    "venv": "/home/liumx/.conda/envs/lean/bin/python"
+  },
+  "workflow": {},
+  "root_dir": "my_example/crypto_predict"
+}

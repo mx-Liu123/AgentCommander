@@ -4,6 +4,7 @@ import json
 import glob
 import multiprocessing
 import queue
+import base64
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
@@ -496,11 +497,25 @@ def get_file_content():
         
     # Read content
     try:
+        # Check for image extension to prioritize binary read
+        is_image = full_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']
+        
+        if is_image:
+            with open(full_path, 'rb') as f:
+                content = base64.b64encode(f.read()).decode('utf-8')
+            return jsonify({"content": content, "encoding": "base64"})
+
         with open(full_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        return jsonify({"content": content})
+        return jsonify({"content": content, "encoding": "utf-8"})
     except UnicodeDecodeError:
-        return jsonify({"content": "[Binary or Non-UTF8 Content]"})
+        # Fallback for other binary files (non-image but binary)
+        try:
+             with open(full_path, 'rb') as f:
+                content = base64.b64encode(f.read()).decode('utf-8')
+             return jsonify({"content": content, "encoding": "base64"})
+        except Exception as e:
+             return jsonify({"content": f"[Error reading binary file: {e}]"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -666,9 +681,33 @@ def start_agent():
     ensure_cache() # Ensure default cache exists if targeted
     if agent_process and agent_process.is_alive():
         return jsonify({"error": "Agent already running"}), 400
-        
+
     config = request.json
+    print(f"DEBUG: start_agent received config. workflow type: {type(config.get('workflow'))}")
     
+    # Fallback: If workflow is empty/invalid/dict-without-nodes, try to reload from config.json
+    # This handles cases where frontend state might be stale or corrupted (e.g. sending {})
+    req_wf = config.get('workflow')
+    is_invalid_wf = False
+    if not req_wf: is_invalid_wf = True
+    elif isinstance(req_wf, dict) and 'nodes' not in req_wf: is_invalid_wf = True
+    elif isinstance(req_wf, str) and not req_wf.strip(): is_invalid_wf = True
+    
+    if is_invalid_wf:
+        print("DEBUG: Request workflow invalid/empty. Fallback to config.json.")
+        try:
+            saved_conf = load_config()
+            if saved_conf.get('workflow'):
+                config['workflow'] = saved_conf['workflow']
+                print(f"DEBUG: Restored workflow from saved config: {config['workflow']}")
+        except Exception as e:
+            print(f"DEBUG: Failed to fallback load config: {e}")
+
+    if isinstance(config.get('workflow'), str):
+        print(f"DEBUG: workflow is string: {config['workflow']}")
+    else:
+        print(f"DEBUG: workflow is NOT string. Keys: {list(config.get('workflow', {}).keys())}")
+
     # Resolve workflow if it's a path string
     if isinstance(config.get('workflow'), str):
         wf_path_str = config['workflow']
@@ -681,12 +720,15 @@ def start_agent():
         elif wf_path_app.exists():
             wf_path = wf_path_app
             
+        print(f"DEBUG: Resolved wf_path: {wf_path}")
+        
         if not wf_path:
             return jsonify({"error": f"Workflow file not found: {wf_path_str} (checked in task root and app root)"}), 400
             
         try:
             with open(wf_path, 'r', encoding='utf-8') as f:
                 config['workflow'] = json.load(f)
+                print(f"DEBUG: Loaded workflow from file. Nodes: {'nodes' in config['workflow']}")
         except Exception as e:
             return jsonify({"error": f"Failed to load workflow file: {e}"}), 400
 
