@@ -302,9 +302,8 @@
              </div>
         </div>
 
-        <!-- File Preview/Edit Modal -->
-        <div class="modal fade" id="fileModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <!-- File Preview/Edit Modal -->
+            <div class="modal fade" id="fileModal" tabindex="-1">            <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <div class="modal-content bg-dark text-light">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">{{ previewFile.name }}</h5>
@@ -637,7 +636,7 @@
              </div>
         </div>
         <!-- Large Text Editor Modal -->
-        <div class="modal fade" id="largeEditorModal" tabindex="-1" aria-hidden="true">
+        <div class="modal fade" id="largeEditorModal" tabindex="-1">
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content bg-dark text-light border-secondary">
                     <div class="modal-header border-secondary">
@@ -1002,9 +1001,8 @@
                     let body = { action, ...payload };
                     // Send content + config for both Update (Cache) and Save As
                     if (action === 'update' || action === 'save_as') {
-                        body.content = config.value.workflow; 
-                        body.global_vars = config.value.global_vars;
-
+                        body.content = graphStack.value[0].graph; // Fix: Use actual graph data
+                        // body.global_vars = config.value.global_vars; // Decoupled: vars in config.json
                     }
                     
                     const res = await fetch('/api/workflow', {
@@ -1421,27 +1419,35 @@
                     await fetch(`/api/stop?type=${type}`, {method: 'POST'});
                 };
                 const updateTaskRoot = async () => {
+                    const oldRoot = taskRoot.value; // Store old root for potential revert
                     try {
-                        const res = await fetch('/api/set_root', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path: taskRoot.value})});
-                        if(res.ok) {
-                            alert("Root updated successfully!");
-                            // Refresh explorer if it was viewing the old root
-                            explorerRoot.value = taskRoot.value;
-                            await loadFiles();
-                            
-                            // Refresh branches
-                            const res2 = await fetch('/api/config');
-                            if(res2.ok) {
-                                const data2 = await res2.json();
-                                availableBranches.value = data2.branches;
-                            }
-                        } else {
+                        const res = await fetch('/api/config');
+                        if (res.ok) {
                             const data = await res.json();
-                            alert("Failed to update root: " + (data.error || 'Unknown error'));
+                            taskRoot.value = data.root_dir;
+                            config.value.n_cycles = data.n_cycles;
+                            config.value.global_vars = data.global_vars;
+                            config.value.mode = data.mode;
+                            config.value.resume_branch_id = data.resume_branch_id;
+                            // config.value.workflow is already handled by get_config in the backend (always hardcoded to cache file)
+                            
+                            // Handle any alert messages from backend
+                            if (data.alert_message) {
+                                alert(data.alert_message);
+                                data.alert_message = ''; // Clear after displaying
+                            }
+
+                        } else {
+                            const errorData = await res.json();
+                            alert('Error loading config: ' + (errorData.error || res.statusText));
+                            taskRoot.value = oldRoot; // Revert to old root if error
                         }
-                    } catch(e) {
-                        alert("Network error: " + e.message);
+                    } catch (e) {
+                        alert('Network or server error loading config: ' + e.message);
+                        taskRoot.value = oldRoot; // Revert to old root if error
                     }
+                    await loadFiles(); // Reload files for the updated root directory
+                    await loadWorkflowFromCache();
                 };
                 const saveWorkflow = () => {
                      alert("Workflow saved to memory for current session.");

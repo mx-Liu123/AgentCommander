@@ -80,28 +80,13 @@ def load_config():
             with open(CONFIG_FILE, 'r') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"Error loading config: {e}")
-    
-    # Create default config if missing
-    default_config = {
-        "root_dir": "./example/diabetes_sklearn",
-        "n_cycles": 10,
-        "port": 8080,
-        "global_vars": {
-            "DEFAULT_SYS": "You are an expert AI Data Scientist. Your goal is to minimize Mean Squared Error (MSE) on the Diabetes dataset. Modify `strategy.py` to  improve the `Strategy` class (sklearn model). Metric: MSE (Lower is better).",
-            "plot_names": "",
-            "venv": "/home/username/.conda/envs/agent_commander/bin/python"
-        },
-        "workflow": "pylib/.cache/current_graph.json"
-    }
-    try:
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(default_config, f, indent=2)
-        print(f"Created default config: {CONFIG_FILE}")
-    except Exception as e:
-        print(f"Error creating default config: {e}")
-        
-    return default_config
+            # If config.json exists but is invalid JSON
+            print(f"Error loading config from existing file: {e}")
+            raise ValueError(f"Error loading config.json. Please check its format. Error: {e}")
+    else:
+        # If config.json does not exist, do not create it.
+        # Instead, raise an error and tell the user to rename config_template.json.
+        raise FileNotFoundError("config.json not found. Please rename config_template.json to config.json and configure it.")
 
 config_data = load_config()
 CURRENT_ROOT_DIR = config_data.get('root_dir', os.getcwd())
@@ -145,7 +130,11 @@ def get_status():
 @app.route('/api/config', methods=['GET'])
 def get_config():
     # Load fresh config
-    conf = load_config()
+    try:
+        conf = load_config()
+    except (FileNotFoundError, ValueError) as e:
+        # If config.json is missing or invalid, return error to frontend
+        return jsonify({"error": str(e)}), 500
     
     # Load default template for initial structure (nodes/edges)
     default_workflow = {}
@@ -164,7 +153,7 @@ def get_config():
         "root_dir": CURRENT_ROOT_DIR,
         "branches": get_branches(CURRENT_ROOT_DIR),
         "global_vars": conf.get('global_vars', {}),
-        "workflow": conf.get('workflow', "pylib/default_graph.json")
+        "workflow": "pylib/.cache/current_graph.json"
     })
     return jsonify(response)
 
@@ -174,10 +163,8 @@ def save_config_api():
     try:
         new_conf = request.json
         
-        # Sanitize: Ensure 'workflow' is a path string, not a full object
-        # This prevents config.json from becoming bloated with the entire graph
-        if 'workflow' in new_conf and isinstance(new_conf['workflow'], (dict, list)):
-            print("Warning: Attempted to save full workflow object to config.json. Ignoring 'workflow' field to preserve file path.")
+        # Sanitize: Ensure 'workflow' is NOT saved to config.json (Hardcoded now)
+        if 'workflow' in new_conf:
             del new_conf['workflow']
 
         # Merge with existing to avoid losing keys not sent
@@ -239,6 +226,9 @@ def load_config_from_api():
         with open(target_path, 'r') as f:
             new_conf = json.load(f)
             
+        # Clean workflow if present (Hardcoded path usage)
+        if 'workflow' in new_conf: del new_conf['workflow']
+            
         # Update Active Config
         with open(CONFIG_FILE, 'w') as f:
             json.dump(new_conf, f, indent=2)
@@ -292,6 +282,11 @@ def workflow_api():
                 # content from UI -> Cache
                 # We expect data to contain: content (graph), global_vars, llm_changeable_vars
                 save_data = data.get('content', {}) # This is the graph (nodes/edges)
+                
+                # Defensive Check: Prevent overwriting cache with empty/invalid graph
+                if not isinstance(save_data, dict) or 'nodes' not in save_data: # Allow empty nodes list if valid structure, but structure must exist
+                     print(f"WARNING: Refusing to save invalid graph to cache. Data type: {type(save_data)}")
+                     return jsonify({"error": "Invalid graph data: missing 'nodes'"}), 400
                 
                 # Decoupling: Do NOT save global_vars/llm_changeable_vars to workflow file
                 # They are managed by config.json
@@ -685,52 +680,26 @@ def start_agent():
     config = request.json
     print(f"DEBUG: start_agent received config. workflow type: {type(config.get('workflow'))}")
     
-    # Fallback: If workflow is empty/invalid/dict-without-nodes, try to reload from config.json
-    # This handles cases where frontend state might be stale or corrupted (e.g. sending {})
-    req_wf = config.get('workflow')
-    is_invalid_wf = False
-    if not req_wf: is_invalid_wf = True
-    elif isinstance(req_wf, dict) and 'nodes' not in req_wf: is_invalid_wf = True
-    elif isinstance(req_wf, str) and not req_wf.strip(): is_invalid_wf = True
+    # FORCE HARDCODED WORKFLOW PATH
+    # We ignore whatever the frontend or config.json says about 'workflow' path.
+    # We always use the active graph in the cache.
+    wf_path_str = "pylib/.cache/current_graph.json"
+    wf_path = (APP_ROOT / wf_path_str).resolve()
     
-    if is_invalid_wf:
-        print("DEBUG: Request workflow invalid/empty. Fallback to config.json.")
-        try:
-            saved_conf = load_config()
-            if saved_conf.get('workflow'):
-                config['workflow'] = saved_conf['workflow']
-                print(f"DEBUG: Restored workflow from saved config: {config['workflow']}")
-        except Exception as e:
-            print(f"DEBUG: Failed to fallback load config: {e}")
-
-    if isinstance(config.get('workflow'), str):
-        print(f"DEBUG: workflow is string: {config['workflow']}")
-    else:
-        print(f"DEBUG: workflow is NOT string. Keys: {list(config.get('workflow', {}).keys())}")
-
-    # Resolve workflow if it's a path string
-    if isinstance(config.get('workflow'), str):
-        wf_path_str = config['workflow']
-        wf_path_task = (Path(CURRENT_ROOT_DIR) / wf_path_str).resolve()
-        wf_path_app = (APP_ROOT / wf_path_str).resolve()
+    if not wf_path.exists():
+        print(f"DEBUG: {wf_path} not found. Trying default.")
+        wf_path = (APP_ROOT / "pylib/default_graph.json").resolve()
         
-        wf_path = None
-        if wf_path_task.exists():
-            wf_path = wf_path_task
-        elif wf_path_app.exists():
-            wf_path = wf_path_app
+    if not wf_path.exists():
+        return jsonify({"error": f"Workflow file not found at {wf_path}"}), 400
             
-        print(f"DEBUG: Resolved wf_path: {wf_path}")
-        
-        if not wf_path:
-            return jsonify({"error": f"Workflow file not found: {wf_path_str} (checked in task root and app root)"}), 400
-            
-        try:
-            with open(wf_path, 'r', encoding='utf-8') as f:
-                config['workflow'] = json.load(f)
-                print(f"DEBUG: Loaded workflow from file. Nodes: {'nodes' in config['workflow']}")
-        except Exception as e:
-            return jsonify({"error": f"Failed to load workflow file: {e}"}), 400
+    try:
+        with open(wf_path, 'r', encoding='utf-8') as f:
+            config['workflow'] = json.load(f)
+            print(f"DEBUG: Loaded workflow from HARDCODED path: {wf_path}")
+            print(f"DEBUG: Nodes count: {len(config['workflow'].get('nodes', []))}")
+    except Exception as e:
+        return jsonify({"error": f"Failed to load workflow file: {e}"}), 400
 
     # Inject environment python path if not set by user
     if 'venv' not in config.get('global_vars', {}):

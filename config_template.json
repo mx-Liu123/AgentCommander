@@ -8,6 +8,5 @@
     "venv": "/home/username/.conda/envs/agent_commander/bin/python"
   },
   "mode": "new",
-  "resume_branch_id": "",
-  "workflow": "pylib/.cache/current_graph.json"
+  "resume_branch_id": ""
 }
