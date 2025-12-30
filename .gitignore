@@ -16,3 +16,5 @@ my_example/
 pylib/.cache/
 push.sh
 pull.sh
+config_*.json
+!config_template.json
