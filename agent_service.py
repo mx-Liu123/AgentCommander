@@ -210,7 +210,7 @@ class GraphExecutor:
                 new_result = result.format(**vars_dict)
                 if new_result == result: break
                 result = new_result
-            except (KeyError, ValueError):
+            except (KeyError, ValueError, IndexError):
                 # Fallback: Use Regex for simple {var} substitution
                 # This handles JSON braces {} which confuse .format(), and missing keys
                 old_result = result

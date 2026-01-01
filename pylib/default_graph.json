@@ -455,12 +455,12 @@
               "config": {
                 "file_permission_mode": "forbid",
                 "model": "gemini-3-flash-preview",
+                "response_output": "experiment_design",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
                 "session_mode": "inherit",
                 "timeout": 600,
-                "user_template": "{DEFAULT_SYS}\n\nEvaluator Output:\n{test_output}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nHuman Instructions:\nstep1: Analyze current research context. Understand what experiment design is adopted this round.\nstep2: Output a 'experiment design' to summarize it in string format.",
-                "response_output": "experiment_design"
+                "user_template": "{DEFAULT_SYS}\n\nEvaluator Output:\n{test_output}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nHuman Instructions:\nstep1: Analyze current research context. Understand what experiment design is adopted this round.\nstep2: Output a 'experiment design' to summarize it in string format."
               },
               "id": "n_1766216815818",
               "label": "experiment design",
