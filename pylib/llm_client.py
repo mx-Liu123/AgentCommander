@@ -25,11 +25,18 @@ def call_gemini(prompt, session_id=None, timeout=None, model=None, cwd=None):
         run_kwargs["timeout"] = timeout
 
     if session_id:
-        # Resume session: Prompt must be passed via -p flag (Positional fails, Stdin fails in this env)
-        cmd.extend(["--resume", session_id])
-        cmd.extend(["-p", prompt])
-        cmd.append("-y") # Enable YOLO mode for tools
-        run_kwargs["input"] = "" # Prevent hanging by closing stdin
+        if session_id == "AUTO_RESUME":
+            # Auto-resume latest session
+            cmd.append("-r")
+            cmd.extend(["-p", prompt])
+            cmd.append("-y")
+            run_kwargs["input"] = ""
+        else:
+            # Resume specific session
+            cmd.extend(["--resume", session_id])
+            cmd.extend(["-p", prompt])
+            cmd.append("-y") # Enable YOLO mode for tools
+            run_kwargs["input"] = "" # Prevent hanging by closing stdin
     else:
         # New session: Pass prompt via stdin
         cmd.append("-y") # Enable YOLO mode
@@ -45,7 +52,27 @@ def call_gemini(prompt, session_id=None, timeout=None, model=None, cwd=None):
         result = subprocess.run(cmd, **run_kwargs)
         
         # Session Recovery Logic
-        if result.returncode != 0 and session_id and "Session not found" in result.stderr:
+        if result.returncode != 0 and session_id == "AUTO_RESUME":
+            sys.stderr.write(f"⚠️ Auto-resume failed: {result.stderr.strip()}. Starting NEW session...\n")
+            
+            # Fallback: New Session
+            new_cmd = ["gemini", "-o", "stream-json"]
+            if target_model: new_cmd.extend(["-m", target_model])
+            new_cmd.append("-y")
+            
+            # Update kwargs: prompt goes to stdin for new session
+            new_kwargs = run_kwargs.copy()
+            new_kwargs["input"] = prompt 
+            
+            final_result = subprocess.run(new_cmd, **new_kwargs)
+            if final_result.returncode == 0:
+                sys.stderr.write("✅ Started new session.\n")
+                result = final_result
+            else:
+                sys.stderr.write(f"❌ New session creation failed: {final_result.stderr.strip()}\n")
+                result = final_result
+
+        elif result.returncode != 0 and session_id and "Session not found" in result.stderr:
             sys.stderr.write(f"⚠️ Session '{session_id}' not found. Attempting to attach to last active session...\n")
             
             # Retry 1: Auto-resume (-r without ID)

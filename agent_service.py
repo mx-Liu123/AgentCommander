@@ -304,7 +304,8 @@ class GraphExecutor:
         if session_mode == "inherit" and session_id_input_var:
             session_id = self.context.get(session_id_input_var)
             if not session_id:
-                self.logger.log(f"⚠️ Inherit session var '{session_id_input_var}' is empty/missing. Starting new session.")
+                self.logger.log(f"⚠️ Inherit session var '{session_id_input_var}' is empty/missing. Fallback to AUTO_RESUME (-r).")
+                session_id = "AUTO_RESUME"
 
         # Default model settings
         timeout = cfg.get("timeout", 600)
