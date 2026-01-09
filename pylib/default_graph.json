@@ -6,7 +6,7 @@
     },
     {
       "source": "init_global",
-      "target": "setup_workspace"
+      "target": "copy_init_exp"
     },
     {
       "source": "setup_workspace",
@@ -88,6 +88,10 @@
       "label": null,
       "source": "n_1766633914418",
       "target": "reset_fail_count"
+    },
+    {
+      "source": "copy_init_exp",
+      "target": "setup_workspace"
     }
   ],
   "id": "root_graph",
@@ -252,7 +256,7 @@
                 "session_id_output": "session_v1",
                 "session_mode": "new",
                 "timeout": 600,
-                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nCurrent Working Directory: {current_exp_path}\nVenv: {venv}\nCycle: {cycle}/{n_cycles}\nPrevious Hypothesis: {hypothesis}\nPrevious Experiment Design: {exp_design}\nPrevious Results: {result_analysis}\nImproved from Parent: {is_improved}\nMore experiment record:\n{lessons_text}\n\nHuman Instructions:\nstep1: Analyze the previous research context. Read the strategy code (*.py) code. Make sure you read the important result picture {plot_names}. They are bad windows in @eval_out.txt.\nstep2: Output a plan to improve the strategy in string format. explain how it relates to ur analysis."
+                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nCurrent Working Directory: {current_exp_path}\nVenv: {venv}\nCycle: {cycle}/{n_cycles}\nPrevious Hypothesis: {hypothesis}\nPrevious Experiment Design: {exp_design}\nPrevious Results: {result_analysis}\nImproved from Parent: {is_improved}\nMore experiment record:\n{lessons_text}\n\nHuman Instructions:\nstep1: Analyze the previous research context. Read the strategy code (*.py) code. Make sure you read the important result picture {plot_names}. They are bad windows in @eval_out.txt. Find where the problem is in previous experiment.\nstep2: Output a plan to improve the strategy in string format. explain how it relates to ur analysis. [Important] No edit/run code, just answer."
               },
               "id": "step1_impl",
               "label": "1.make hypothesis",
@@ -748,6 +752,18 @@
         "y": 919
       },
       "type": "write_history"
+    },
+    {
+      "id": "copy_init_exp",
+      "type": "python_script",
+      "label": "Copy Init Exp (expB.0.0)",
+      "position": {
+        "x": 400,
+        "y": 200
+      },
+      "config": {
+        "code": "\nimport shutil\nfrom pathlib import Path\n\n# Only run this logic if we are at the very start of a new branch (L=1, S=1)\nif context.get('layer_idx') == 1 and context.get('sub_idx') == 1:\n    b_idx = context.get('branch_idx', 1)\n    p_path_str = context.get('next_parent_path')\n    \n    if p_path_str:\n        src = Path(p_path_str)\n        if src.exists():\n            # Define destination: BranchX/expX.0.0\n            branch_dir = service.tasks_dir / f\"Branch{b_idx}\"\n            branch_dir.mkdir(parents=True, exist_ok=True)\n            \n            init_exp_name = f\"exp{b_idx}.0.0\"\n            dest = branch_dir / init_exp_name\n            \n            if not dest.exists():\n                logger.log(f\"\ud83d\udccb [Init] Copying Parent {src.name} -> {init_exp_name}...\")\n                try:\n                    # Copy tree\n                    shutil.copytree(src, dest, dirs_exist_ok=True)\n                    \n                    # Update context to use this new 0.0 as the parent for 1.1\n                    context['next_parent_path'] = str(dest)\n                    logger.log(f\"\u2705 [Init] Created Base Experiment: {dest}\")\n                    \n                    # Optional: Mark history to say it's a clone\n                    h_path = dest / 'history.json'\n                    if h_path.exists():\n                        try:\n                            with open(h_path, 'r') as f: h = json.load(f)\n                            h['note'] = 'Copied as Branch Base (expB.0.0)'\n                            with open(h_path, 'w') as f: json.dump(h, f, indent=2)\n                        except: pass\n                        \n                except Exception as e:\n                    logger.error(f\"\u274c [Init] Failed to copy init exp: {e}\")\n            else:\n                logger.log(f\"\u2139\ufe0f [Init] Base {init_exp_name} exists. Using it as parent.\")\n                context['next_parent_path'] = str(dest)\n        else:\n            logger.log(f\"\u26a0\ufe0f [Init] Parent path not found: {src}\")\n"
+      }
     }
   ]
 }

@@ -109,7 +109,7 @@
         <div v-if="currentTab !== 'workflow' && currentTab !== 'viz'" class="container-fluid">
             <div class="row">
                 <!-- Sidebar -->
-                <div class="col-md-2 bg-dark sidebar p-3">
+                <div class="col-md-2 bg-dark sidebar p-3 d-flex flex-column">
                     <h4 class="mb-4 text-primary">Agent Commander</h4>
                     <div class="nav flex-column nav-pills">
                         <button class="nav-link" :class="{active: currentTab==='control'}" @click="currentTab='control'">🤖 Control Panel</button>
@@ -118,11 +118,38 @@
                         <button class="nav-link" :class="{active: currentTab==='viz'}" @click="currentTab='viz'; renderViz();">🌳 Progress Tree</button>
                     </div>
                     <hr>
-                    <div class="mt-auto">
+                    <div>
                         <small class="text-muted">Status:</small><br>
                         <span :class="{'text-success': isRunning, 'text-secondary': !isRunning}">
                             {{ isRunning ? '● Running' : '○ Idle' }}
                         </span>
+                    </div>
+
+                    <!-- Explorer AI Chat -->
+                    <div v-if="currentTab === 'explorer'" class="mt-3 border-top border-secondary pt-3 d-flex flex-column" style="flex: 1; min-height: 0;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                             <h6 class="text-light m-0">Explorer AI</h6>
+                             <button class="btn btn-sm btn-outline-danger py-0 px-1" @click="resetExplorerChatSession" title="Reset">🗑️</button>
+                        </div>
+                        
+                        <div class="chat-messages flex-grow-1 mb-2 border border-secondary rounded p-2" ref="explorerChatContainer" style="overflow-y: auto; background: #252526;">
+                            <div v-for="(msg, i) in explorerChatMessages" :key="i" class="mb-2" :class="msg.role === 'user' ? 'text-end' : 'text-start'">
+                                <div class="d-inline-block p-1 rounded text-start" :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-secondary text-light'" style="max-width: 100%; font-size: 0.8rem;">
+                                    {{ msg.content }}
+                                </div>
+                            </div>
+                             <div v-if="explorerIsChatting" class="text-start"><span class="badge bg-secondary">...</span></div>
+                        </div>
+                        
+                        <div class="mb-2 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="chk-yolo" v-model="explorerChatYolo">
+                            <label class="form-check-label text-muted small" for="chk-yolo">Allow Edits (-y)</label>
+                        </div>
+                
+                        <div class="input-group input-group-sm">
+                             <textarea class="form-control bg-dark text-light border-secondary" rows="2" v-model="explorerChatInput" @keyup.enter.ctrl="sendExplorerChatMessage" placeholder="Cmd..."></textarea>
+                             <button class="btn btn-sm btn-success" @click="sendExplorerChatMessage" :disabled="explorerIsChatting || !explorerChatInput.trim()">➤</button>
+                        </div>
                     </div>
                 </div>
 
@@ -357,6 +384,7 @@
                 <div class="p-3 border-top border-secondary bg-dark">
                     <div class="input-group input-group-sm mb-2">
                         <select class="form-select bg-dark text-light border-secondary" v-model="chatModel">
+                            <option value="qwen">Qwen (CLI)</option>
                             <option value="auto-gemini-3">Auto (Gemini 3)</option>
                             <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                             <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -503,6 +531,7 @@
                 <div v-if="selectedNode.type === 'llm_generate'">
                     <label>Model</label>
                     <select class="form-select mb-2" v-model="selectedNode.config.model">
+                        <option value="qwen">Qwen (CLI)</option>
                         <option value="auto-gemini-3">Auto (Gemini 3)</option>
                         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                         <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -706,6 +735,16 @@
                 const chatMinimized = ref(true);
                 const chatContainer = ref(null);
 
+                // Explorer Chat State
+                const explorerChatMessages = ref([{role: 'assistant', content: 'Hi! I can help you manage files in this directory.'}]);
+                const explorerChatInput = ref('');
+                const explorerIsChatting = ref(false);
+                const explorerChatModel = ref('gemini-3-pro-preview');
+                const explorerChatSessionId = ref(null);
+                const explorerChatMinimized = ref(true);
+                const explorerChatContainer = ref(null);
+                const explorerChatYolo = ref(false);
+
                 const expandText = (content, fieldKey) => {
                      previewFile.value = { 
                          name: `Editing: ${fieldKey}`, 
@@ -722,7 +761,50 @@
                     global_vars: {}, workflow: {}
                 });
 
-                // Graph Editor State
+                // ... (rest of setup) ...
+
+                const sendExplorerChatMessage = async () => {
+                    if (!explorerChatInput.value.trim()) return;
+                    const msg = explorerChatInput.value;
+                    explorerChatMessages.value.push({ role: 'user', content: msg });
+                    explorerChatInput.value = '';
+                    explorerIsChatting.value = true;
+                    nextTick(() => { if(explorerChatContainer.value) explorerChatContainer.value.scrollTop = explorerChatContainer.value.scrollHeight; });
+                    
+                    try {
+                        const res = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                message: msg,
+                                session_id: explorerChatSessionId.value,
+                                model: explorerChatModel.value,
+                                cwd: explorerRoot.value, // Context: Current Directory
+                                yolo: explorerChatYolo.value
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.error) {
+                            explorerChatMessages.value.push({ role: 'assistant', content: `Error: ${data.error}` });
+                        } else {
+                            explorerChatMessages.value.push({ role: 'assistant', content: data.response });
+                            explorerChatSessionId.value = data.session_id;
+                        }
+                    } catch (e) {
+                        explorerChatMessages.value.push({ role: 'assistant', content: `Network Error: ${e.message}` });
+                    } finally {
+                        explorerIsChatting.value = false;
+                        nextTick(() => { if(explorerChatContainer.value) explorerChatContainer.value.scrollTop = explorerChatContainer.value.scrollHeight; });
+                        // Refresh file list as AI might have created/deleted files
+                        await loadFiles();
+                    }
+                };
+
+                const resetExplorerChatSession = () => {
+                    explorerChatSessionId.value = null;
+                    explorerChatMessages.value = [{role: 'assistant', content: 'Session reset. New directory context ready.'}];
+                };
+
                 const graphStack = ref([]); 
                 const currentGraph = ref({ nodes: [], edges: [] });
                 const pan = ref({ x: 0, y: 0 });
@@ -1782,7 +1864,9 @@
                     saveFile, saveStatus, showBranchBoxes, expandText, loadFiles,
                     chatMessages, chatInput, isChatting, chatModel, sendChatMessage, resetChatSession, chatMinimized, chatContainer,
                     refreshWorkflow, apiAction, saveAsWorkflow, loadFromPath, startTour,
-                    addGlobalVar, removeGlobalVar, renameGlobalVar, saveConfig, saveConfigAs, loadConfigFrom // Export new functions
+                    addGlobalVar, removeGlobalVar, renameGlobalVar, saveConfig, saveConfigAs, loadConfigFrom,
+                    explorerChatMessages, explorerChatInput, explorerIsChatting, explorerChatModel, 
+                    explorerChatMinimized, explorerChatContainer, explorerChatYolo, sendExplorerChatMessage, resetExplorerChatSession
                 };
             }
         }).mount('#app');

@@ -343,23 +343,35 @@ def chat_api():
     user_msg = data.get('message', '')
     session_id = data.get('session_id')
     model = data.get('model', 'auto')
+    target_cwd = data.get('cwd')
+    yolo_param = data.get('yolo', True)
     
-    # Ensure cache exists so AI finds the file
+    # Ensure cache exists so AI finds the file (only critical for Workflow mode, but harmless otherwise)
     ensure_cache()
     
-    # Context instruction
-    context_instruction = (
-        "You are the Workflow Editor Assistant. "
-        "You are working in a directory containing the active workflow file 'current_graph.json'. "
-        "User requests will be about modifying this workflow. "
-        "1. Always read 'current_graph.json' first to understand the structure (nodes, edges, IDs). "
-        "2. Directly modify 'current_graph.json' using 'replace' or 'write_file'. "
-        "3. Respond concisely. "
-        f"\nUser Request: {user_msg}"
-    )
-    
-    # The 'cwd' is key here.
-    cwd_str = str(CACHE_DIR.resolve())
+    if target_cwd:
+        # File Explorer Mode
+        cwd_str = str(Path(target_cwd).resolve())
+        if not os.path.exists(cwd_str):
+             return jsonify({"error": f"Directory not found: {cwd_str}"}), 404
+             
+        context_instruction = (
+            f"You are an AI Assistant working in directory: {cwd_str}. "
+            "You can read/write files and execute commands in this directory. "
+            f"\nUser Request: {user_msg}"
+        )
+    else:
+        # Workflow Editor Mode (Default)
+        cwd_str = str(CACHE_DIR.resolve())
+        context_instruction = (
+            "You are the Workflow Editor Assistant. "
+            "You are working in a directory containing the active workflow file 'current_graph.json'. "
+            "User requests will be about modifying this workflow. "
+            "1. Always read 'current_graph.json' first to understand the structure (nodes, edges, IDs). "
+            "2. Directly modify 'current_graph.json' using 'replace' or 'write_file'. "
+            "3. Respond concisely. "
+            f"\nUser Request: {user_msg}"
+        )
     
     try:
         response, new_sid = llm_client.call_gemini(
@@ -367,7 +379,8 @@ def chat_api():
             session_id=session_id,
             model=model,
             cwd=cwd_str,
-            timeout=600
+            timeout=600,
+            yolo=yolo_param
         )
         return jsonify({"response": response, "session_id": new_sid})
     except Exception as e:
