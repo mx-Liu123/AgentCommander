@@ -4,7 +4,7 @@
 
 **Automating the loop of discovery.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Gemini CLI](https://img.shields.io/badge/Powered%20by-Gemini%20CLI-8E75B2)](https://ai.google.dev/)
 
@@ -101,6 +101,7 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
 
 4.  **Run an Example Task:**
     *   Ensure the `Root Dir` in the Control Panel points to `example/diabetes_sklearn` (relative path).
+    *   **Configure `venv`**: In the "Global Variables" section, ensure the `venv` variable points to your python executable (e.g., `python` or `/path/to/your/conda/env/bin/python`). This is used by the workflow to run evaluation scripts.
     *   Click "Start Agent" to begin the automated experiment loop.
     *   Monitor progress in the "Console" and "Explorer" tabs.
 
@@ -148,7 +149,7 @@ The `config.json` file controls the core behavior of the agent system. You can m
 
 *   **root_dir**: The working directory where experiments and data are stored.
 *   **n_cycles**: The number of experiment iterations to run.
-*   **global_vars**: These are hardcoded environment variables (e.g., API keys, system paths) accessible throughout the workflow.
+*   **global_vars**: These are hardcoded environment variables (e.g., `venv` for the python path, system paths) accessible throughout the workflow.
 *   **workflow**: The workflow definition graph. Can be a full JSON object or a string path to a separate JSON file (e.g., `"my_workflows/workflow_v1.json"`).
 *   **Shared Context**: All nodes in the workflow exchange data through a shared variable pool, known as the `context`. This allows for flexible data flow between different modules without strict parameter passing.
 
@@ -197,4 +198,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
