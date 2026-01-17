@@ -20,6 +20,8 @@ We built this tool on the belief that repetitive iteration is a task for machine
 
 ## What is AgentCommander?
 
+![AgentCommander Concept](main_pic.png)
+
 AgentCommander is an advanced, **graph-based workflow execution engine** designed to orchestrate AI Agents for complex, iterative tasks. Built on top of the **Gemini CLI**, it enables Machine Learning engineers to construct highly customizable, infinite-loop workflows.
 
 ### Key Capabilities
@@ -43,6 +45,7 @@ AgentCommander is an advanced, **graph-based workflow execution engine** designe
 *   **Infinite Iteration & Advanced Learning**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely. Advanced features like the **"Lesson" mechanism** (to learn from past errors) and **online search integration** (for inspiration) are available in example workflows to boost continuous improvement.
 *   **ML & Symbolic Regression**: specifically tailored to assist in discovering mathematical formulas and optimizing ML models through iterative experimentation.
 *   **Experiment Management & Evolutionary Tree**: Automatically track and visualize experiment history, metrics, and branches as an **"evolutionary tree"**, where each experiment node connects to its parent.
+![Progress Tree](progress_tree.png)
 *   **Dynamic Configuration**: Manage global variables and system settings through a centralized UI.
 
 ## Installation
