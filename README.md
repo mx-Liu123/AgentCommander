@@ -39,7 +39,7 @@ AgentCommander is an advanced, **graph-based workflow execution engine** designe
 
 *   **Visual Workflow Editor with AI Assistant**: Design complex agent loops and decision trees using a node-based interface, enhanced by a built-in AI Assistant that can modify the workflow directly via natural language commands (e.g., "Add a shell check after step 2").
 ![Workflow Editor](workflow_editor.png)
-*   **Gemini CLI Integration**: Deeply integrated with the Gemini ecosystem for powerful, prompt-driven code generation and analysis.
+*   **Multi-Model CLI Integration**: Deeply integrated with both **Gemini CLI** and **Qwen CLI** for powerful, prompt-driven code generation and analysis. Choose the backend that best fits your needs directly from the UI.
 *   **Infinite Iteration & Advanced Learning**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely. Advanced features like the **"Lesson" mechanism** (to learn from past errors) and **online search integration** (for inspiration) are available in example workflows to boost continuous improvement.
 *   **ML & Symbolic Regression**: specifically tailored to assist in discovering mathematical formulas and optimizing ML models through iterative experimentation.
 *   **Experiment Management & Evolutionary Tree**: Automatically track and visualize experiment history, metrics, and branches as an **"evolutionary tree"**, where each experiment node connects to its parent.
@@ -48,8 +48,10 @@ AgentCommander is an advanced, **graph-based workflow execution engine** designe
 ## Installation
 
 ### Prerequisites
-1.  **Gemini CLI**: Ensure you have the Gemini CLI installed and configured.
+1.  **Gemini CLI** (Recommended): Ensure you have the Gemini CLI installed and configured.
     *   *See official Gemini CLI documentation for installation instructions.*
+2.  **Qwen CLI** (Alternative): Support for the Qwen (Alibaba) CLI is also available.
+    *   *Ensure `qwen` is available in your system PATH.*
 
 ### Gemini CLI Configuration Recommendation
 To leverage the latest capabilities, including the powerful Pro3 and Flash3 models, it is highly recommended to enable "Gemini Preview" in your Gemini CLI settings. This allows AgentCommander to access cutting-edge model versions.
@@ -177,8 +179,8 @@ For "Strict", "Restricted (Whitelist)", and "Restricted (Blacklist)" modes, the 
 
 While AgentCommander leverages the Gemini CLI, which primarily operates within its designated working directory, it's crucial to understand the inherent risks:
 
-*   **Gemini Model Access (Default YOLO Mode)**: By default, when invoked by AgentCommander, Gemini models operate with the `-y` (YOLO - You Only Live Once) parameter. This means the model is granted permission to use *any* available tool and has *arbitrary privileges* within the working directory. This design choice enables powerful automation but requires extreme caution.
-*   **File Access Scope**: The Gemini CLI typically focuses on files within the specified working directory (`root_dir`). However, any generated scripts or commands executed by the agent **theoretically could interact with or modify files outside this directory**, especially if the agent's logic or your system's configuration allows it.
+*   **CLI Model Access (Default YOLO Mode)**: By default, when invoked by AgentCommander, models (Gemini or Qwen) operate with the `-y` (YOLO - You Only Live Once) parameter. This means the model is granted permission to use *any* available tool and has *arbitrary privileges* within the working directory. This design choice enables powerful automation but requires extreme caution.
+*   **File Access Scope**: The CLI tools typically focus on files within the specified working directory (`root_dir`). However, any generated scripts or commands executed by the agent **theoretically could interact with or modify files outside this directory**, especially if the agent's logic or your system's configuration allows it.
 *   **Best Practices**: For maximum security, it is highly recommended to:
     *   **Use a Sandboxed Environment**: Run AgentCommander and its agents within a container (e.g., Docker) or a virtual machine.
     *   **Restrict User Permissions**: Execute the application and agents with a user account that has minimal necessary file system permissions, preventing unintended modifications to critical system files or sensitive data.
@@ -186,7 +188,7 @@ While AgentCommander leverages the Gemini CLI, which primarily operates within i
 
 ## Todo
 
-*   [ ] **Claude Code Support**: Integrate Anthropic's Claude as an alternative LLM backend.
+*   [x] **Multi-backend Support**: Basic integration for Gemini, Qwen, and Claude-CLI.
 *   [ ] **Parallel Workflow Example**: Add concrete examples and templates for running experiments in parallel.
 
 ## Contributing

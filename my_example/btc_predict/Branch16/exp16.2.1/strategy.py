@@ -39,8 +39,8 @@ def rolling_hurst(series, window=100):
 
 def get_search_configs():
     """
-    Search space for Regime-Adaptive Precision (RAP) Strategy v2.
-    Focus: Patience in Trending, Defense in High Volatility.
+    Search space for Regime-Adaptive Precision (RAP) Strategy.
+    Restoring conservative exit gates while maintaining dynamic sigma.
     """
     base = {
         "required_train_days": 150,
@@ -55,49 +55,35 @@ def get_search_configs():
     
     configs = []
     
-    # 1. "Trending Patience" (The Solution)
-    # Logic: Relaxed exits in Regime 0, standard in others.
+    # 1. Balanced RAP (Winning Parameters from Parent)
     c1 = base.copy()
     c1.update({
-        "sigma_thresh": 610, 
-        "adx_thresh": 12, 
-        "atr_mult_base": 2.6, 
-        "rsi_upper": 75, 
-        "rsi_lower": 25, 
-        "t_remaining_min": 30, 
-        "er_thresh": 0.14, 
-        "tension_limit": 0.40, # Relaxed global tension
-        "divergence_thresh": 0.04,
-        "use_breadth": True, 
-        "breadth_gate": 0.25, 
-        "vti_limit": 0.07,
-        "hurst_thresh": 0.53, 
-        "pressure_trigger": 1.10, 
-        "obv_corr_gate": 0.30,
+        "sigma_thresh": 620, "adx_thresh": 12, "atr_mult_base": 2.6, 
+        "rsi_upper": 75, "rsi_lower": 25, "t_remaining_min": 30, 
+        "er_thresh": 0.14, "tension_limit": 0.38, "divergence_thresh": 0.04,
+        "use_breadth": True, "breadth_gate": 0.25, "vti_limit": 0.07,
+        "hurst_thresh": 0.53, "pressure_trigger": 1.10, "obv_corr_gate": 0.30,
         "ignition_thr": 1.30,
-        "tension_gate": 0.05, 
-        "tension_boost": 0.10,
-        "exit_tension_gate": 0.08, # Looser global exit gate
+        "tension_gate": 0.05, "tension_boost": 0.10,
+        "exit_tension_gate": 0.075,
         "adx_sigma_slope": 0.005,
         "accum_bypass": True
     })
     configs.append(c1)
 
-    # 2. "Trend Hunter" (Aggressive Entry)
-    # Logic: Lower sigma threshold to catch more trends early
+    # 2. More Conservative (Lower Sigma, Higher Hurst)
     c2 = c1.copy()
     c2.update({
-        "sigma_thresh": 590,
-        "exit_tension_gate": 0.09
+        "sigma_thresh": 600,
+        "hurst_thresh": 0.55
     })
     configs.append(c2)
 
-    # 3. "Defensive Shield" (Higher Sigma, Tighter High-Vol defense)
-    # Logic: Higher barrier to entry
+    # 3. Aggressive Trending (Higher Sigma, Lower Exit Gate)
     c3 = c1.copy()
     c3.update({
-        "sigma_thresh": 630,
-        "pressure_trigger": 1.20
+        "sigma_thresh": 640,
+        "exit_tension_gate": 0.070
     })
     configs.append(c3)
 
@@ -395,6 +381,7 @@ class ModelStrategy:
         ema20, ema50 = talib.EMA(c_vals, 20), talib.EMA(c_vals, 50)
         rvol = v_vals / (talib.SMA(v_vals, 20) + 1e-8)
         
+        # Extended Persistence Logic
         hurst = rolling_hurst(pd.Series(c_vals), window=100).values
         hurst_grad = pd.Series(hurst).diff(5).fillna(0).values
         obv = talib.OBV(c_vals, v_vals)
@@ -411,6 +398,7 @@ class ModelStrategy:
         
         v_ratio = pd.Series(v_vals) / (pd.Series(v_vals).rolling(20).mean() + 1e-8)
         trend_dist = np.abs(c_vals - ema50) / (ema50 + 1e-8)
+        vti = (v_ratio * trend_dist).fillna(0).values
         
         mkt_mom, market_breadth = np.zeros(len(df_test)), np.zeros(len(df_test))
         if self.request_data:
@@ -435,6 +423,7 @@ class ModelStrategy:
         trend_dist_signed_all = (c_vals - ema50) / (ema50 + 1e-8)
         tension_all = np.log1p(time_since_conf) * np.abs(trend_dist_signed_all)
 
+        # --- Continuous Tension Calc (Test Time) ---
         roll_high_20_test = pd.Series(h_vals).rolling(20).max()
         roll_low_20_test = pd.Series(l_vals).rolling(20).min()
         is_high_test = (h_vals >= roll_high_20_test)
@@ -452,169 +441,220 @@ class ModelStrategy:
         boost_count = 0
         fast_exit_count = 0
         
+        # RAP Diagnostics
         rap_sigma_rescued = 0
         rap_accum_rescued = 0
         
         for i in range(self.seq_len, len(df_test)):
             t_total, s_next = mu[i, 0], sigma[i, 0]
-            # Regime Detection: [Trending, Ranging, HighVol]
+            # --- Regime Detection ---
+            # gate_weights: [Trending, Ranging, HighVol]
             p_regime = regime_probs[i]
             if np.isnan(p_regime[0]): continue
             regime_idx = np.argmax(p_regime)
             
             alpha_dir = 1 if state[i] == -1 else -1 
+            
             vol_shock = atr5[i] / (atr20[i] + 1e-8)
             tension = tension_all[i]
             adx_factor = max(1.0, adx[i] / 30.0)
 
+            # Micro-structure Ignition Detect (Alpha Confirmed)
             is_igniting_long = pressure_ratio[i] > self.ignition_thr and obv_corr[i] > 0.35 and mkt_mom[i] > 0 and vol_shock < 2.0
             is_igniting_short = pressure_ratio[i] < (1.0 / self.ignition_thr) and obv_corr[i] > 0.35 and mkt_mom[i] < 0 and vol_shock < 2.0
             is_igniting = (alpha_dir == 1 and is_igniting_long) or (alpha_dir == -1 and is_igniting_short)
             
-            # 1. Regime-Adaptive Budgeting
+            # 1. Budget Modulation & Regime Adaptation
             budget_mult = 1.0
+            if hurst[i] > 0.60 or hurst_grad[i] > 0.02: 
+                budget_mult += 0.25
+            elif is_igniting:
+                budget_mult += 0.20 
+            elif hurst[i] < 0.50: 
+                budget_mult -= 0.15
             
-            # Base logic
-            if hurst[i] > 0.60: budget_mult += 0.25
-            elif is_igniting: budget_mult += 0.20 
-            
-            # Regime Specifics
+            # Regime-Specific Modulation
             dyn_rsi_upper, dyn_rsi_lower, dyn_sigma_mult = self.rsi_upper, self.rsi_lower, 1.0
-            
             if regime_idx == 0: # Trending Specialist
-                budget_mult += 0.30  # Increased Patience
-                dyn_rsi_upper, dyn_rsi_lower = 90, 10 # Allow chasing
-                dyn_sigma_mult = 1.15 # Looser sigma
+                budget_mult += 0.20
+                dyn_rsi_upper, dyn_rsi_lower = 82, 18
+                dyn_sigma_mult = 1.10
             elif regime_idx == 1: # Ranging Specialist
                 budget_mult -= 0.10
-                dyn_rsi_upper, dyn_rsi_lower = 75, 25
-                dyn_sigma_mult = 1.0
+                dyn_rsi_upper, dyn_rsi_lower = 72, 28
+                dyn_sigma_mult = 0.95
             else: # High Vol Specialist (Defensive)
-                budget_mult -= 0.50 # Drastic reduction
-                dyn_rsi_upper, dyn_rsi_lower = 60, 40 # Very strict
-                dyn_sigma_mult = 0.80
+                budget_mult -= 0.40
+                dyn_rsi_upper, dyn_rsi_lower = 65, 35
+                dyn_sigma_mult = 0.85
             
-            if roll_tension_lo[i] > self.tension_gate: budget_mult += self.tension_boost
+            # Simplified Elasticity Boost
+            current_tension = roll_tension_lo[i] if alpha_dir == 1 else roll_tension_hi[i]
+            if current_tension > self.tension_gate:
+                 budget_mult += self.tension_boost
+                 boost_count += 1
+            
             if obv_corr[i] > self.obv_corr_gate: budget_mult += 0.10
             
+            # RAP: ADX-Dynamic Sigma Scaling
             base_budget = budget_mult
-            # ADX-Sigma Dynamic
             if self.adx_sigma_slope > 0:
+                # Pivot at 20.0 instead of 25.0 to be less restrictive
                 adx_contrib = (adx[i] - 20.0) * self.adx_sigma_slope
-                if adx_contrib < 0 or ((alpha_dir == 1 and c_vals[i] > ema20[i]) or (alpha_dir == -1 and c_vals[i] < ema20[i])):
+                # Only restrict budget if trend is NOT aligned
+                if adx_contrib < 0:
                     budget_mult += adx_contrib
+                else:
+                    # Positive contribution requires trend alignment
+                    if (alpha_dir == 1 and c_vals[i] > ema20[i]) or (alpha_dir == -1 and c_vals[i] < ema20[i]):
+                        budget_mult += adx_contrib
 
             eff_sigma_thresh = self.sigma_thresh * budget_mult * dyn_sigma_mult
             
             if not np.isnan(t_total) and s_next > eff_sigma_thresh:
-                f_counts["Sig"] += 1; continue
+                f_counts["Sig"] += 1
+                continue
+            
+            # Track if RAP-Sigma actually allowed a trade that the base budget would have rejected
             if not np.isnan(t_total) and s_next > (self.sigma_thresh * base_budget):
                 rap_sigma_rescued += 1
-            if np.isnan(t_total): continue
             
-            # 2. Entry Filters
-            eff_t_min = self.t_remaining_min * (0.75 if is_igniting else 1.0)
+            if np.isnan(t_total):
+                continue
+            
+            # 2. Dynamic Runway (Compression on Acceleration)
+            runway_mult = 1.0
+            if hurst_grad[i] > 0.01: runway_mult = 0.80
+            if is_igniting: runway_mult = 0.75 
+            
+            eff_t_min = self.t_remaining_min * runway_mult
             t_remaining = t_total - time_since_conf[i]
             if t_remaining < eff_t_min: f_counts["Rem"] += 1; continue
             
-            # Accumulation Bypass
-            is_accum = self.accum_bypass and ((alpha_dir==1 and pressure_ratio[i]>1.25) or (alpha_dir==-1 and pressure_ratio[i]<0.8)) and vol_shock < 1.0
-            if hurst[i] < (self.hurst_thresh - 0.05) and not is_accum:
-                f_counts["Fractal"] += 1; continue
-            if is_accum and hurst[i] < (self.hurst_thresh - 0.05):
-                rap_accum_rescued += 1
+            # 3. Persistence Floor vs. Acceleration Override (Selective Bypass)
+            eff_hurst_floor = self.hurst_thresh - (0.05 if is_igniting else 0.0)
             
-            # Tension & Technicals
+            # RAP: Accumulation Bypass
+            is_accumulation = False
+            if self.accum_bypass:
+                # Accumulation: Quiet Volatility + Strong Pressure
+                is_accum_long = (alpha_dir == 1 and pressure_ratio[i] > 1.25 and vol_shock < 1.0)
+                is_accum_short = (alpha_dir == -1 and pressure_ratio[i] < 0.8 and vol_shock < 1.0)
+                is_accumulation = (is_accum_long or is_accum_short)
+
+            if hurst[i] < eff_hurst_floor and hurst_grad[i] < 0.01: 
+                if not is_accumulation:
+                    f_counts["Fractal"] += 1; continue
+                else:
+                    rap_accum_rescued += 1
+            
+            # ADX Lag Bypass for ignition
+            if not is_igniting:
+                if i > 5 and adx[i] < adx_sma[i] and adx[i] > 35: f_counts["ADX"] += 1; continue
+            
+            # --- Tension & ER Logic (HARDENED) ---
+            dyn_tension_limit = self.tension_limit * adx_factor
+            dyn_er_thresh = self.er_thresh / (1.0 + 0.3 * min(vol_shock, 3.0))
+
+            is_alpha = (mkt_mom[i] * alpha_dir) > 0
+            dyn_div_limit = self.divergence_thresh * (3.0 if is_alpha else 1.0)
+
             if vol_shock > 2.5: f_counts["Vol"] += 1; continue 
-            if er_10[i] < self.er_thresh: f_counts["ER"] += 1; continue 
-            if tension > (self.tension_limit * adx_factor): f_counts["Tens"] += 1; continue 
-            if np.abs(mkt_mom[i]) > (self.divergence_thresh * 3.0): f_counts["Div"] += 1; continue 
+            if er_10[i] < dyn_er_thresh: f_counts["ER"] += 1; continue 
+            if tension > dyn_tension_limit: f_counts["Tens"] += 1; continue 
+            if np.abs(mkt_mom[i]) > dyn_div_limit: f_counts["Div"] += 1; continue 
             
-            # VTI & Breadth
+            # Robust VTI Filter 
             vti_signed = v_ratio_all[i] * trend_dist_signed_all[i]
-            if alpha_dir == 1 and vti_signed > self.vti_limit and obv_corr[i] < self.obv_corr_gate: f_counts["VTI"] += 1; continue
-            if alpha_dir == -1 and vti_signed < -self.vti_limit and obv_corr[i] < self.obv_corr_gate: f_counts["VTI"] += 1; continue
+            
+            if alpha_dir == 1 and vti_signed > self.vti_limit and obv_corr[i] < self.obv_corr_gate:
+                f_counts["VTI"] += 1; continue
+            if alpha_dir == -1 and vti_signed < -self.vti_limit and obv_corr[i] < self.obv_corr_gate:
+                f_counts["VTI"] += 1; continue
             
             if self.use_breadth:
                  if alpha_dir == 1 and market_breadth[i] < -self.breadth_gate: f_counts["Breadth"] += 1; continue
                  if alpha_dir == -1 and market_breadth[i] > self.breadth_gate: f_counts["Breadth"] += 1; continue
 
-            # Entry Execution
             close = c_vals[i]
-            # State Management
+            is_uptrend = (close > ema50[i]) and (close > ema20[i])
+            is_downtrend = (close < ema50[i]) and (close < ema20[i])
+            is_strong_trend = adx[i] > self.adx_thresh
+            
+            # Entry Microstructure Trigger
+            allow_trade = (vol_shock < 1.8) or (is_strong_trend and rvol[i] > 1.2) or is_igniting
+            
+            # --- Stateful Position Management ---
             if i > 0: current_pos = signals[i-1]
             else: current_pos = 0
             
             new_signal = 0
-            entry_long, entry_short = False, False
             
-            # Relaxed entry for Trending
-            rsi_check_long = rsi[i] < dyn_rsi_upper
-            rsi_check_short = rsi[i] > dyn_rsi_lower
+            # 1. Check Entry (with Dynamic RSI)
+            entry_long = False
+            entry_short = False
             
-            if state[i] == -1 and rsi_check_long: # Bullish
-                if (adx[i] > 10 and pressure_ratio[i] > 1.0) or is_igniting: entry_long = True
-            elif state[i] == 1 and rsi_check_short: # Bearish
-                if (adx[i] > 10 and pressure_ratio[i] < 1.0) or is_igniting: entry_short = True
+            if allow_trade:
+                if state[i] == -1: # Seeking Peak (Bullish Setup)
+                    if (is_uptrend and is_strong_trend and pressure_ratio[i] > self.pressure_trigger and rsi[i] > 45) or is_igniting_long:
+                        if rsi[i] < dyn_rsi_upper and rsi_vel[i] > -2: 
+                            entry_long = True
+                elif state[i] == 1: # Seeking Trough (Bearish Setup)
+                    if (is_downtrend and is_strong_trend and pressure_ratio[i] < (1.0 / self.pressure_trigger) and rsi[i] < 55) or is_igniting_short:
+                        if rsi[i] > dyn_rsi_lower and rsi_vel[i] < 2: 
+                            entry_short = True
             
-            # Exit Logic (Regime Adaptive)
+            # 2. Manage State (Regime-Adaptive Exits)
             if current_pos == 0:
                 if entry_long: new_signal = 1
                 elif entry_short: new_signal = -1
             elif current_pos == 1: # Long
-                if entry_short: new_signal = -1
+                if entry_short: new_signal = -1 # Flip
                 else:
-                    exit_cond = False
                     if regime_idx == 0: # Trending: Patience
-                        # Only exit if trend broken or massive exhaustion
-                        if close < ema50[i]: exit_cond = True
-                        if rsi[i] > 90 and close < ema20[i]: exit_cond = True # Climax
+                        exit_cond = (close < ema50[i] and rsi[i] < 42) or (rsi[i] > 92)
                     elif regime_idx == 1: # Ranging: Precision
-                        if close < ema20[i] and rsi[i] < 45: exit_cond = True
-                        if rsi[i] > 80: exit_cond = True
-                    else: # High Vol: Defense
-                        if close < ema20[i]: exit_cond = True
+                        exit_cond = (close < ema20[i] and rsi[i] < 48) or (rsi[i] > 78)
+                    else: # High Vol: Safety
+                        exit_cond = (close < ema20[i]) or (rsi[i] > 75)
                     
-                    # Fast Exit (Disabled for Trending)
-                    if regime_idx != 0 and roll_tension_lo[i] > self.exit_tension_gate and close < ema20[i]:
+                    # NEW: Fast Exit for Stretched positions
+                    if roll_tension_lo[i] > self.exit_tension_gate and close < ema20[i]:
                         exit_cond = True
                         fast_exit_count += 1
-                        
-                    if not exit_cond: new_signal = 1
+                    
+                    if exit_cond: new_signal = 0
+                    else: new_signal = 1 # Hold
             elif current_pos == -1: # Short
-                if entry_long: new_signal = 1
+                if entry_long: new_signal = 1 # Flip
                 else:
-                    exit_cond = False
                     if regime_idx == 0: # Trending
-                        if close > ema50[i]: exit_cond = True
-                        if rsi[i] < 10 and close > ema20[i]: exit_cond = True
+                        exit_cond = (close > ema50[i] and rsi[i] > 58) or (rsi[i] < 8)
                     elif regime_idx == 1: # Ranging
-                        if close > ema20[i] and rsi[i] > 55: exit_cond = True
-                        if rsi[i] < 20: exit_cond = True
+                        exit_cond = (close > ema20[i] and rsi[i] > 52) or (rsi[i] < 22)
                     else: # High Vol
-                        if close > ema20[i]: exit_cond = True
+                        exit_cond = (close > ema20[i]) or (rsi[i] < 25)
                     
-                    # Fast Exit (Disabled for Trending)
-                    if regime_idx != 0 and roll_tension_hi[i] > self.exit_tension_gate and close > ema20[i]:
+                    # NEW: Fast Exit for Stretched positions
+                    if roll_tension_hi[i] > self.exit_tension_gate and close > ema20[i]:
                         exit_cond = True
                         fast_exit_count += 1
-                        
-                    if not exit_cond: new_signal = -1
+
+                    if exit_cond: new_signal = 0
+                    else: new_signal = -1 # Hold
             
             signals[i] = new_signal
             
-            # Adaptive Stop Loss
             if not np.isnan(atr[i]):
-                # Widen stop for trending
-                sl_mult = 1.5 if regime_idx == 0 else (1.2 if hurst[i] > 0.6 else 0.8)
+                sl_mult = 1.2 if hurst[i] > 0.6 else 0.8
                 
-                # Tighten if tension is high (trailing)
+                # NEW: Adaptive Tension SL
                 if (new_signal == 1 and roll_tension_lo[i] > self.exit_tension_gate) or \
                    (new_signal == -1 and roll_tension_hi[i] > self.exit_tension_gate):
                     sl_mult *= 0.75
                 
-                sl[i] = (self.atr_mult_base * sl_mult * atr[i] / close) * (1 + s_next/2000)
-            else: sl[i] = 0.03
+                sl[i] = (self.atr_mult_base * sl_mult * atr[i] / close) * (1 + s_next/1500)
+            else: sl[i] = 0.02
             
         print(f"Decisions: {int(np.sum(signals!=0))} Signal Events (Boosted: {boost_count}, FastExit: {fast_exit_count}, RAP-Sigma: {rap_sigma_rescued}, RAP-Accum: {rap_accum_rescued}). Filtered: {f_counts}")
         return pd.DataFrame({'signal': signals, 'stop_loss_pct': sl}, index=df_test.index)
