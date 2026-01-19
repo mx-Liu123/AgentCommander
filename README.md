@@ -16,7 +16,9 @@
 
 Born from the complex computational needs of scientific research, AgentCommander addresses a critical bottleneck in machine learning: the exhaustive cost of manual trial-and-error. 
 
-We built this tool on the belief that repetitive iteration is a task for machines, not humans. By automating the debugging and refinement cycle, AgentCommander empowers researchers to focus on high-level creative pursuits and systemic design.
+I attempted to iterate and optimize machine learning code using various existing tools, but found them lacking in flexibility. **Cursor Agent** excels at code completion but cannot design long-term evolutionary paths. **OpenEvolve/AlphaEvolve** offers powerful population-based evolution but focuses on group behavior rather than deep, customized single-agent optimization.
+
+AgentCommander fills this gap. It is built on the belief that repetitive iteration is a task for machines, not humans. By automating the debugging and refinement cycle with a highly customizable graph-based workflow, AgentCommander empowers researchers to focus on high-level creative pursuits and systemic design.
 
 ## What is AgentCommander?
 
@@ -37,13 +39,21 @@ AgentCommander is an advanced, **graph-based workflow execution engine** designe
 
 ![Control Panel](control_panel.png)
 
+## Architecture & Safety
+
+One of the primary challenges in autonomous coding agents is safety. We specifically chose to build upon **Gemini CLI** and **Qwen CLI** (derived from Gemini CLI) because they offer a robust foundation for **directory-level sandboxing**.
+
+*   **Sandboxing**: Unlike other agent frameworks (e.g., Claude Code) where file system isolation can be difficult to enforce, the CLI-based approach allows AgentCommander to strictly limit the agent's read/write access to specific experiment directories. This ensures that the agent can freely experiment within its sandbox without risking modifications to your system-level files.
+*   **Transparent Debugging (White-box)**: A major pain point with many agent frameworks is their "black-box" nature—if the agent gets stuck, you can't easily see why. In AgentCommander, every experiment runs in its own folder. You can simply `cd` into any experiment directory and run `gemini -r` (or `qwen -c`) to **resume the conversation exactly where the agent left off**. This gives you complete transparency and control to inspect the agent's thought process or manually intervene.
+
 ## Key Features
 
 *   **Visual Workflow Editor with AI Assistant**: Design complex agent loops and decision trees using a node-based interface, enhanced by a built-in AI Assistant that can modify the workflow directly via natural language commands (e.g., "Add a shell check after step 2").
 ![Workflow Editor](workflow_editor.png)
 *   **Multi-Model CLI Integration**: Deeply integrated with both **Gemini CLI** and **Qwen CLI** for powerful, prompt-driven code generation and analysis. Choose the backend that best fits your needs directly from the UI.
+*   **Inherited CLI Skills**: Because it sits on top of the CLI ecosystem, AgentCommander inherits all the native capabilities of the underlying CLI tools. Any "skill" supported by Gemini/Qwen CLI (e.g., web search, file management, system commands) is automatically available to your agents within the workflow.
 *   **Infinite Iteration & Advanced Learning**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely. Advanced features like the **"Lesson" mechanism** (to learn from past errors) and **online search integration** (for inspiration) are available in example workflows to boost continuous improvement.
-*   **ML & Symbolic Regression**: specifically tailored to assist in discovering mathematical formulas and optimizing ML models through iterative experimentation.
+*   **ML & Symbolic Regression**: Specifically tailored to assist in discovering mathematical formulas and optimizing ML models through iterative experimentation.
 *   **Experiment Management & Evolutionary Tree**: Automatically track and visualize experiment history, metrics, and branches as an **"evolutionary tree"**, where each experiment node connects to its parent.
 ![Progress Tree](progress_tree.png)
 *   **Dynamic Configuration**: Manage global variables and system settings through a centralized UI.
