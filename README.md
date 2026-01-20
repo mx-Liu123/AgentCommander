@@ -111,6 +111,7 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
 > 💡 **Tip**: Look for the **question mark (?) icon** in various parts of the UI (Control Panel, File Explorer, Workflow Editor). Clicking it will start a **guided tour** to help you understand the features of that specific section.
 
 1.  **Start the UI Server:**
+    *(If running for the first time, please rename `config_template.json` to `config.json` and configure it to match your environment).*
     ```bash
     bash run_ui.sh
     ```
