@@ -69,7 +69,7 @@ One of the primary challenges in autonomous coding agents is safety. We specific
 
 ### Prerequisites
 1.  **Gemini CLI** (Recommended): Ensure you have the **latest version** of the Gemini CLI installed. Older versions may not recognize newer model aliases, leading to "Model not found" errors.
-    *   **Installation**: `npm install -g @google/gemini-chat-cli@latest`
+    *   **Installation**: `npm install -g @google/gemini-cli@latest`
     *   **Node.js Warning**: If you see Node.js version warnings, please upgrade to the latest LTS to ensure CLI stability.
 2.  **Qwen CLI** (Alternative): Support for the Qwen (Alibaba) CLI is also available.
     *   **Why Qwen?**: It provides an "OpenAI-compatible, OAuth free tier: use an OpenAI-compatible API, or sign in with Qwen OAuth to get 2,000 free requests/day." This allows for extensive experimentation with custom models and a generous free quota.

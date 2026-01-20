@@ -134,8 +134,9 @@ def call_llm(prompt, session_id=None, timeout=None, model=None, cwd=None, yolo=T
         stderr = result.stderr
         
         if result.returncode != 0:
-            print(f"❌ {binary.upper()} CLI Error: {stderr}")
-            return stdout, None
+            err_msg = f"❌ {binary.upper()} CLI Error: {stderr.strip()}"
+            print(err_msg) # Keep printing to stdout for CLI usage
+            raise RuntimeError(err_msg)
 
         # Parse Stream-JSON Output
         if is_qwen:
@@ -144,11 +145,16 @@ def call_llm(prompt, session_id=None, timeout=None, model=None, cwd=None, yolo=T
             return parse_gemini_output(stdout, session_id)
 
     except subprocess.TimeoutExpired:
-        print(f"❌ {binary.upper()} Call Timed Out after {timeout}s")
-        return "[TIMEOUT]", None
+        err_msg = f"❌ {binary.upper()} Call Timed Out after {timeout}s"
+        print(err_msg)
+        raise RuntimeError(err_msg)
     except Exception as e:
-        print(f"❌ Failed to call {binary.upper()}: {e}")
-        return "", None
+        # If it's already our RuntimeError, re-raise
+        if isinstance(e, RuntimeError) and str(e).startswith("❌"):
+            raise e
+        err_msg = f"❌ Failed to call {binary.upper()}: {e}"
+        print(err_msg)
+        raise RuntimeError(err_msg)
 
 def parse_gemini_output(stdout, original_session_id):
     new_session_id = None

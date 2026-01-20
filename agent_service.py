@@ -31,14 +31,23 @@ class AgentLogger:
     def __init__(self, queue):
         self.queue = queue
 
+    def clean(self, text):
+        # Remove ANSI color codes
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', str(text))
+
     def log(self, message):
+        clean_msg = self.clean(message)
         if self.queue:
-            self.queue.put({"type": "log", "data": message})
+            try: self.queue.put({"type": "log", "data": clean_msg})
+            except: pass
         print(message) 
 
     def error(self, message):
+        clean_msg = self.clean(message)
         if self.queue:
-            self.queue.put({"type": "error", "data": message})
+            try: self.queue.put({"type": "error", "data": clean_msg})
+            except: pass
         print(f"ERROR: {message}", file=sys.stderr)
 
 class GraphExecutor:
@@ -321,6 +330,7 @@ class GraphExecutor:
         
         self.logger.log(f"      🗣️  LLM Call ({model}, {session_mode}) in {cwd_path}...")
         
+        start_time = time.time()
         if model == "claude-cli":
             cmd = [
                 "claude", "-p", prompt, 
@@ -346,6 +356,10 @@ class GraphExecutor:
                 response, new_session_id = llm_client.call_gemini(prompt, session_id, timeout=timeout, model=model, cwd=str(cwd_path))
             except Exception as e: self.logger.error(str(e))
             
+        duration = time.time() - start_time
+        if duration < 5:
+            self.logger.log(f"⚠️ Warning: LLM response was extremely fast ({duration:.2f}s). This usually means the CLI backend failed or is not configured (e.g., installation/Oauth prob/model name). If using Gemini, try running 'gemini -r' inside the experiment directory to see the raw error.")
+
         self.context["last_response"] = response
         
         # --- Restore / Enforce File Permissions ---
