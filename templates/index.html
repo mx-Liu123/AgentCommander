@@ -383,7 +383,9 @@
                 
                 <div class="p-3 border-top border-secondary bg-dark">
                     <div class="input-group input-group-sm mb-2">
-                        <select class="form-select bg-dark text-light border-secondary" v-model="chatModel">
+                        <select class="form-select bg-dark text-light border-secondary" 
+                                :value="standardModels.includes(chatModel) ? chatModel : 'custom'"
+                                @change="e => { if(e.target.value !== 'custom') chatModel = e.target.value; else chatModel = ''; }">
                             <option value="qwen">Qwen (CLI) (BETA)</option>
                             <option value="auto-gemini-3">Auto (Gemini 3)</option>
                             <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -392,8 +394,24 @@
                             <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
                             <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                             <option value="auto-gemini-2.5">Auto (Gemini 2.5)</option>
+                            <option value="custom">Custom...</option>
                         </select>
                         <button class="btn btn-outline-danger" @click="resetChatSession" title="New Session">🗑️ Reset</button>
+                    </div>
+                    <!-- Custom Chat Model Input -->
+                    <div v-if="!standardModels.includes(chatModel)" class="mb-2 card card-body bg-dark border-secondary p-2">
+                        <label class="small text-muted mb-1">Base CLI</label>
+                        <select class="form-select form-select-sm mb-2 bg-dark text-light border-secondary"
+                                :value="parseCustomModel(chatModel).cli"
+                                @change="e => { const curr = parseCustomModel(chatModel); chatModel = `custom:${e.target.value}:${curr.name}`; }">
+                             <option v-for="cli in customBaseCLIs" :value="cli">{{ cli.toUpperCase() }} CLI</option>
+                        </select>
+                        
+                        <label class="small text-muted mb-1">Model Name</label>
+                        <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                               :value="parseCustomModel(chatModel).name"
+                               @input="e => { const curr = parseCustomModel(chatModel); chatModel = `custom:${curr.cli}:${e.target.value}`; }"
+                               placeholder="e.g. gpt-4o-qwen">
                     </div>
                     <textarea class="form-control bg-dark text-light border-secondary mb-2" rows="3" v-model="chatInput" @keyup.enter.ctrl="sendChatMessage" placeholder="Describe changes (Ctrl+Enter to send)..."></textarea>
                     <button class="btn btn-sm btn-success w-100" @click="sendChatMessage" :disabled="isChatting || !chatInput.trim()">Send Request</button>
@@ -530,7 +548,9 @@
 
                 <div v-if="selectedNode.type === 'llm_generate'">
                     <label>Model</label>
-                    <select class="form-select mb-2" v-model="selectedNode.config.model">
+                    <select class="form-select mb-2" 
+                            :value="standardModels.includes(selectedNode.config.model) ? selectedNode.config.model : 'custom'"
+                            @change="e => { if(e.target.value !== 'custom') selectedNode.config.model = e.target.value; else selectedNode.config.model = ''; }">
                         <option value="qwen">Qwen (CLI) (BETA)</option>
                         <option value="auto-gemini-3">Auto (Gemini 3)</option>
                         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -540,7 +560,24 @@
                         <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                         <option value="auto-gemini-2.5">Auto (Gemini 2.5)</option>
                         <option value="claude-cli">Claude CLI (BETA not recommended)</option>
+                        <option value="custom">Custom...</option>
                     </select>
+                    <!-- Custom Model Input -->
+                    <div v-if="!standardModels.includes(selectedNode.config.model)" class="mb-2 card card-body bg-dark border-secondary p-2">
+                        <label class="small text-muted mb-1">Base CLI</label>
+                        <select class="form-select form-select-sm mb-2 bg-dark text-light border-secondary"
+                                :value="parseCustomModel(selectedNode.config.model).cli"
+                                @change="e => updateCustomModel(selectedNode.config, 'model', e.target.value, parseCustomModel(selectedNode.config.model).name)">
+                             <option v-for="cli in customBaseCLIs" :value="cli">{{ cli.toUpperCase() }} CLI</option>
+                        </select>
+                        
+                        <label class="small text-muted mb-1">Model Name</label>
+                        <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                               :value="parseCustomModel(selectedNode.config.model).name"
+                               @input="e => updateCustomModel(selectedNode.config, 'model', parseCustomModel(selectedNode.config.model).cli, e.target.value)"
+                               placeholder="e.g. gemini-2.0-flash-exp">
+                    </div>
+
                     <label>Timeout</label>
                     <input type="number" class="form-control mb-2" v-model.number="selectedNode.config.timeout">
                     
@@ -707,6 +744,30 @@
                 const saveStatus = ref('');
                 let fileModal = null;
                 
+                const standardModels = [
+                    'qwen', 'auto-gemini-3', 'gemini-2.5-pro', 'gemini-2.5-flash', 
+                    'gemini-2.5-flash-lite', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 
+                    'auto-gemini-2.5', 'claude-cli'
+                ];
+                
+                const customBaseCLIs = ['gemini', 'qwen', 'claude'];
+                
+                const parseCustomModel = (modelStr) => {
+                    if (modelStr && modelStr.startsWith('custom:')) {
+                        const parts = modelStr.split(':');
+                        // custom:cli:name
+                        if (parts.length >= 3) {
+                            return { cli: parts[1], name: parts.slice(2).join(':') };
+                        }
+                    }
+                    // Default fallback if just switched to custom or invalid
+                    return { cli: 'gemini', name: '' };
+                };
+                
+                const updateCustomModel = (targetObj, key, cli, name) => {
+                    targetObj[key] = `custom:${cli}:${name}`;
+                };
+
                 const isAtRoot = computed(() => {
                     const norm = (p) => {
                         if (!p) return '';
@@ -1866,7 +1927,8 @@
                     refreshWorkflow, apiAction, saveAsWorkflow, loadFromPath, startTour,
                     addGlobalVar, removeGlobalVar, renameGlobalVar, saveConfig, saveConfigAs, loadConfigFrom,
                     explorerChatMessages, explorerChatInput, explorerIsChatting, explorerChatModel, 
-                    explorerChatMinimized, explorerChatContainer, explorerChatYolo, sendExplorerChatMessage, resetExplorerChatSession
+                    explorerChatMinimized, explorerChatContainer, explorerChatYolo, sendExplorerChatMessage, resetExplorerChatSession,
+                    standardModels, customBaseCLIs, parseCustomModel, updateCustomModel
                 };
             }
         }).mount('#app');

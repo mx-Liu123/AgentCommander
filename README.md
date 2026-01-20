@@ -63,10 +63,16 @@ One of the primary challenges in autonomous coding agents is safety. We specific
 
 ## Installation
 
+### OS Support
+*   ✅ **Linux & macOS**: Fully supported (native).
+*   ⚠️ **Windows**: **Highly recommended to use WSL2** (Windows Subsystem for Linux). Native Windows support is limited due to the reliance on shell commands within workflows.
+
 ### Prerequisites
-1.  **Gemini CLI** (Recommended): Ensure you have the Gemini CLI installed and configured.
-    *   *See official Gemini CLI documentation for installation instructions.*
+1.  **Gemini CLI** (Recommended): Ensure you have the **latest version** of the Gemini CLI installed. Older versions may not recognize newer model aliases, leading to "Model not found" errors.
+    *   **Installation**: `npm install -g @google/gemini-chat-cli@latest`
+    *   **Node.js Warning**: If you see Node.js version warnings, please upgrade to the latest LTS to ensure CLI stability.
 2.  **Qwen CLI** (Alternative): Support for the Qwen (Alibaba) CLI is also available.
+    *   **Why Qwen?**: It provides an "OpenAI-compatible, OAuth free tier: use an OpenAI-compatible API, or sign in with Qwen OAuth to get 2,000 free requests/day." This allows for extensive experimentation with custom models and a generous free quota.
     *   *Ensure `qwen` is available in your system PATH.*
 
 ### Gemini CLI Configuration Recommendation
@@ -101,6 +107,8 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
     ```
 
 ## Quick Start
+
+> 💡 **Tip**: Look for the **question mark (?) icon** in various parts of the UI (Control Panel, File Explorer, Workflow Editor). Clicking it will start a **guided tour** to help you understand the features of that specific section.
 
 1.  **Start the UI Server:**
     ```bash

@@ -12,24 +12,52 @@ def call_gemini(prompt, session_id=None, timeout=None, model=None, cwd=None, yol
 
 def call_llm(prompt, session_id=None, timeout=None, model=None, cwd=None, yolo=True):
     """
-    Unified LLM caller supporting both Gemini and Qwen CLIs.
+    Unified LLM caller supporting Gemini, Qwen, and custom CLI wrappers.
     """
-    # Determine which CLI to use
     target_model = model if model else GEMINI_MODEL
-    is_qwen = target_model and ("qwen" in target_model.lower() or target_model == "qwen")
     
-    binary = "qwen" if is_qwen else "gemini"
-    
+    # Defaults
+    binary = "gemini"
+    cli_model = target_model
+    is_qwen = False
+
+    # 1. Custom Format Parsing: custom:<cli>:<model_name>
+    if target_model.startswith("custom:"):
+        parts = target_model.split(":", 2) # Limit split to 2 in case model name has colons
+        if len(parts) >= 3:
+            binary = parts[1] # e.g. 'gemini', 'qwen', 'claude'
+            cli_model = parts[2]
+            if binary == "qwen": is_qwen = True
+        else:
+            # Fallback if format is weird
+            cli_model = target_model[7:] # Just strip 'custom:'
+            
+    # 2. Legacy / Standard Logic
+    else:
+        is_explicit_qwen = target_model.startswith("qwen:")
+        is_gemini_prefix = target_model.startswith("gemini") or target_model.startswith("auto-gemini")
+        
+        # Determine if Qwen
+        if is_explicit_qwen or (target_model == "qwen") or (not is_gemini_prefix and target_model != "claude-cli"):
+             is_qwen = True
+             binary = "qwen"
+        
+        if target_model == "claude-cli": 
+            binary = "claude"
+            is_qwen = False
+            
+        # Strip prefix if explicit qwen
+        if is_explicit_qwen:
+            cli_model = target_model[5:]
+
     # Base command
     cmd = [binary, "-o", "stream-json"]
     
-    # Model handling
-    if not is_qwen and target_model:
-        # Gemini uses -m
-        cmd.extend(["-m", target_model])
-    elif is_qwen:
-        # Qwen ignores -m or uses default if not specified
-        pass 
+    # Model handling (-m)
+    # Both Gemini and Qwen support -m for specifying model
+    # Only skip if the model name is exactly the binary name (e.g. just 'qwen') which implies default
+    if cli_model and cli_model != binary and cli_model != "claude-cli":
+        cmd.extend(["-m", cli_model])
     
     run_kwargs = {
         "capture_output": True,
