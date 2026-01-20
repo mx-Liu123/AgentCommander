@@ -29,7 +29,7 @@ AgentCommander is an advanced, **graph-based workflow execution engine** designe
 ### Key Capabilities
 
 * **Symbolic Regression** Automating the search for mathematical expressions.
-* **Hyperparameter Optimization** Intelligent tuning without manual intervention.
+* **ML Structure/Hyperparameter Optimization** Intelligent tuning without manual intervention.
 * **Autonomous Model Refinement** Self-correcting loops for model improvement.
 
 ---
