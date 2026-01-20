@@ -357,7 +357,7 @@ class GraphExecutor:
             except Exception as e: self.logger.error(str(e))
             
         duration = time.time() - start_time
-        if duration < 5:
+        if duration < 1:
             self.logger.log(f"⚠️ Warning: LLM response was extremely fast ({duration:.2f}s). This usually means the CLI backend failed or is not configured (e.g., installation/Oauth prob/model name). If using Gemini, try running 'gemini -r' inside the experiment directory to see the raw error.")
 
         self.context["last_response"] = response
