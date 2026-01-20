@@ -48,7 +48,10 @@ One of the primary challenges in autonomous coding agents is safety. We specific
 
 ## Key Features
 
-*   **Visual Workflow Editor with AI Assistant**: Design complex agent loops and decision trees using a node-based interface, enhanced by a built-in AI Assistant that can modify the workflow directly via natural language commands (e.g., "Add a shell check after step 2").
+*   **Hierarchical Visual Workflow Editor with AI Assistant**: Adopts a sophisticated two-layer architecture to balance granular control with high-level evolution.
+    *   **Inner Subloop (Experiment Lifecycle)**: Encapsulates the rigorous execution logic within a single experiment folder (e.g., Hypothesis Generation $\to$ Code Implementation $\to$ Evaluation $\to$ Result Analysis).
+    *   **Outer Control Plane (Evolutionary Strategy)**: Orchestrates the macro-level logic *between* experiments. This layer manages **lineage inheritance** (cloning and mutating the best strategies), **meta-learning** (extracting lessons from failed branches), and **external exploration** (injecting fresh ideas via web search), ensuring the system evolves continuously rather than just iterating blindly.
+    *   **AI-Assisted Design**: Modify this complex topology directly via natural language commands (e.g., "Add a shell check after step 2").
 ![Workflow Editor](workflow_editor.png)
 *   **Multi-Model CLI Integration**: Deeply integrated with both **Gemini CLI** and **Qwen CLI** for powerful, prompt-driven code generation and analysis. Choose the backend that best fits your needs directly from the UI.
 *   **Inherited CLI Skills**: Because it sits on top of the CLI ecosystem, AgentCommander inherits all the native capabilities of the underlying CLI tools. Any "skill" supported by Gemini/Qwen CLI (e.g., web search, file management, system commands) is automatically available to your agents within the workflow.
