@@ -18,3 +18,17 @@ push.sh
 pull.sh
 config_*.json
 !config_template.json
+
+t1/
+scripts/ml_autosetup_1/*
+!scripts/ml_autosetup_1/strategy.py
+!scripts/ml_autosetup_1/split_data.py
+!scripts/ml_autosetup_1/evaluator.py
+!scripts/ml_autosetup_1/metric.py
+!scripts/ml_autosetup_1/plot.py
+!scripts/ml_autosetup_1/auto_setup.sh
+
+**/__pycache__/
+*.npy
+*.png
+*.csv

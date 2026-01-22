@@ -78,7 +78,7 @@ def call_llm(prompt, session_id=None, timeout=None, model=None, cwd=None, yolo=T
             if is_qwen:
                 cmd.append("-c") # Qwen uses -c for continue
             else:
-                cmd.append("-r") # Gemini uses -r
+                cmd.extend(["--resume", "latest"]) # Gemini explicitly uses --resume latest
                 
             cmd.extend(["-p", prompt])
             if yolo: cmd.append("-y")
