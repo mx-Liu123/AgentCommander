@@ -1,55 +1,63 @@
 import matplotlib
-# Force non-interactive backend to prevent window popup
-matplotlib.use('Agg') 
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import numpy as np
 
 def draw_plots(X_test, y_test, y_pred, output_dir, params):
     """
-    Draws and saves visualization for the current best model.
-    
-    Args:
-        X_test (np.array): Test features.
-        y_test (np.array): Ground truth labels.
-        y_pred (np.array): Model predictions.
-        output_dir (str): Directory to save plots.
-        params (dict): Parameters of the best model.
-        
-    Returns:
-        list: List of saved filenames (absolute or relative paths).
+    Draws 3 random samples comparing Ground Truth Phase vs Predicted Phase.
     """
-    # Define filename - static name to overwrite previous best
-    filename = "best_result_plot.png"
+    filename = "best_result.png"
     filepath = os.path.join(output_dir, filename)
     
     try:
-        plt.figure(figsize=(10, 6))
+        num_samples = len(X_test)
         
-        # Simple default visualization: First 100 samples comparison
-        # (Works for both Regression and some Classification logic)
-        limit = min(100, len(y_test))
-        indices = np.arange(limit)
+        # Calculate Normalized MSE (NMSE) for each sample individually
+        epsilon = 1e-8
+        y_true_flat = y_test.reshape(num_samples, -1)
+        y_pred_flat = y_pred.reshape(num_samples, -1)
+
+        error_energy = np.sum((y_true_flat - y_pred_flat) ** 2, axis=1)
+        true_energy = np.sum(y_true_flat ** 2, axis=1)
         
-        # Flatten if necessary
-        y_t = y_test.ravel()[:limit]
-        y_p = y_pred.ravel()[:limit]
+        sample_nmses = error_energy / (true_energy + epsilon)
         
-        plt.plot(indices, y_t, label="Ground Truth", marker='o', alpha=0.7)
-        plt.plot(indices, y_p, label="Prediction", marker='x', alpha=0.7)
+        # Get indices of the 3 samples with the HIGHEST error (Worst first)
+        k = min(3, num_samples)
+        # argsort gives ascending order, so we take the last k elements and reverse them
+        worst_indices = np.argsort(sample_nmses)[-k:][::-1]
         
-        plt.title(f"Best Model Performance (First {limit} samples)\nScore Improved")
-        plt.xlabel("Sample Index")
-        plt.ylabel("Value")
-        plt.legend()
-        plt.grid(True, alpha=0.3)
+        indices = worst_indices
         
+        fig, axes = plt.subplots(len(indices), 1, figsize=(10, 3 * len(indices)), squeeze=False)
+        
+        for i, idx in enumerate(indices):
+            ax = axes[i, 0]
+            
+            # Handle dimensions: Ensure 1D array for plotting
+            y_true_sample = y_test[idx].ravel()
+            y_pred_sample = y_pred[idx].ravel()
+            
+            ax.plot(y_true_sample, label="Ground Truth", color='black', alpha=0.8, linewidth=1.5)
+            ax.plot(y_pred_sample, label="Prediction", color='cyan', linestyle='--', alpha=0.9, linewidth=1.5)
+            
+            ax.set_title(f"Sample {idx}: Phase Reconstruction (NMSE: {sample_nmses[idx]:.4f})")
+            ax.set_ylabel("Phase")
+            ax.legend(loc="upper right")
+            ax.grid(True, alpha=0.3)
+            
+            if i == len(indices) - 1:
+                ax.set_xlabel("Time Step")
+
+        plt.suptitle("Gravitational Wave Phase Prediction (Worst 3 Samples by NMSE)", fontsize=14)
         plt.tight_layout()
         plt.savefig(filepath)
-        plt.close() # Close memory to avoid leaks
+        plt.close()
         
-        return [filename] # Return the filename
+        return [filename]
         
     except Exception as e:
-        print(f"Warning: Plotting failed inside plot.py: {e}")
+        print(f"Plotting error: {e}")
         return []

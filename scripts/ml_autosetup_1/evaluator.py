@@ -11,10 +11,10 @@ from sklearn.model_selection import train_test_split
 OUTPUT_DIR = os.getcwd()
 
 # Data Configuration
-DATA_DIR = os.path.join(OUTPUT_DIR, "data")
+DATA_DIR = "/home/liumx/test_data"
 X_PATH = os.path.join(DATA_DIR, "X_dev.npy")
 Y_PATH = os.path.join(DATA_DIR, "Y_dev.npy")
-TEST_SIZE = 0.2  # Fraction of dev set used for internal testing
+TEST_SIZE = 0.2
 RANDOM_SEED = 42
 
 # Metric Configuration
@@ -33,14 +33,14 @@ if not (0 < TEST_SIZE < 1):
 if not hasattr(metric, 'calculate_score') or not hasattr(metric, 'HIGHER_IS_BETTER'):
     raise AttributeError("metric.py must define 'calculate_score(y_true, y_pred)' and 'HIGHER_IS_BETTER' (bool).")
 
-def evaluate_single_config(strategy_class, params, X_train, X_test, y_train, y_test):
+def evaluate_single_config(strategy_class, params, X_train, X_test, y_train, y_test, deadline=None):
     """
     Runs a single training and evaluation cycle. 
     Returns a score where LOWER is always BETTER.
     """
     try:
         model = strategy_class(params=params)
-        model.fit(X_train, y_train)
+        model.fit(X_train, y_train, deadline=deadline)
         predictions = model.predict(X_test)
         
         # Check prediction shape
@@ -50,12 +50,13 @@ def evaluate_single_config(strategy_class, params, X_train, X_test, y_train, y_t
         raw_score = metric.calculate_score(y_test, predictions)
         
         # Standardize to "Lower is Better"
-        if metric.HIGHER_IS_BETTER:
-            return -raw_score
-        return raw_score
+        score = -raw_score if metric.HIGHER_IS_BETTER else raw_score
+        return score, predictions, model
+    except TimeoutError:
+        raise
     except Exception as e:
         print(f"Error with params {params}: {e}")
-        return float('inf')
+        return float('inf'), None, None
 
 def run_parameter_search(strategy_module):
     """
@@ -105,18 +106,10 @@ def run_parameter_search(strategy_module):
     else:
         configs = [{}]
 
-    # --- Fail-Fast Leakage Check ---
-    # Check the first configuration before spending time on search
-    if configs:
-        print("\n--- Performing Fail-Fast Leakage Check ---")
-        if check_data_leakage(strategy_module.Strategy, configs[0], X_train, X_test, y_train, y_test):
-            print("ERROR: Data leakage detected in initial check. Aborting search.")
-            return float('inf')
-
     print(f"\nStarting search (LOWER score is BETTER)...")
     
-    soft_limit_seconds = 10 * 60 
-    hard_limit_seconds = 15 * 60 
+    soft_limit_seconds = 600
+    hard_limit_seconds = 900
     
     start_time = time.time()
     soft_limit_end = start_time + soft_limit_seconds
@@ -124,6 +117,8 @@ def run_parameter_search(strategy_module):
     
     best_score = float('inf')
     best_params = None
+    best_model_info = None # (model, preds)
+    checked_params = None
     
     results_file = os.path.join(OUTPUT_DIR, "search_results.csv")
     fieldnames = ["run_id", "score", "params"]
@@ -141,8 +136,16 @@ def run_parameter_search(strategy_module):
             if current_time > hard_limit_end:
                  raise TimeoutError("Hard time limit reached.")
 
-            score = evaluate_single_config(strategy_module.Strategy, params, X_train, X_test, y_train, y_test)
+            score, preds, model = evaluate_single_config(strategy_module.Strategy, params, X_train, X_test, y_train, y_test, deadline=hard_limit_end)
             
+            # --- Fail-Fast Leakage Check (Run on first config) ---
+            if i == 0:
+                print("\n--- Performing Fail-Fast Leakage Check ---")
+                if check_data_leakage(strategy_module.Strategy, params, X_train, X_test, y_train, y_test, model=model, preds_control=preds):
+                    print("ERROR: Data leakage detected in initial check. Aborting search.")
+                    return float('inf')
+                checked_params = params
+
             with open(results_file, 'a', newline='') as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writerow({"run_id": i+1, "score": score, "params": str(params)})
@@ -151,18 +154,14 @@ def run_parameter_search(strategy_module):
             if score < best_score:
                 best_score = score
                 best_params = params
+                best_model_info = (model, preds)
                 print(f"New Best [Run {i+1}]: Score={score:.4f} (Lower is better)")
                 
                 # --- Visualization Hook ---
-                if plot is not None and hasattr(plot, 'draw_plots'):
+                if plot is not None and hasattr(plot, 'draw_plots') and preds is not None:
                     try:
-                        # Re-run prediction for plotting (Minimal change to structure)
-                        # We do this only for the 'Best' so cost is acceptable.
-                        best_model = strategy_module.Strategy(params=params)
-                        best_model.fit(X_train, y_train)
-                        best_preds = best_model.predict(X_test)
-                        
-                        plot_files = plot.draw_plots(X_test, y_test, best_preds, OUTPUT_DIR, params)
+                        # Use cached predictions (No re-training)
+                        plot_files = plot.draw_plots(X_test, y_test, preds, OUTPUT_DIR, params)
                         if plot_files:
                             # Format for LLM/User: @file1.png,@file2.png
                             formatted_names = ",".join([f"@{os.path.basename(f)}" for f in plot_files])
@@ -183,14 +182,17 @@ def run_parameter_search(strategy_module):
     
     # --- Final Data Leakage Check ---
     if best_params is not None:
-        print("\n--- Running Final Data Leakage Check on Best Config ---")
-        if check_data_leakage(strategy_module.Strategy, best_params, X_train, X_test, y_train, y_test):
-            print("CRITICAL: Best configuration failed leakage check! Invalidating score.")
-            return float('inf')
+        if best_params == checked_params:
+            print("\n--- Skipping Final Leakage Check (Already verified first config) ---")
+        else:
+            print("\n--- Running Final Data Leakage Check on Best Config ---")
+            if check_data_leakage(strategy_module.Strategy, best_params, X_train, X_test, y_train, y_test, model=best_model_info[0], preds_control=best_model_info[1]):
+                print("CRITICAL: Best configuration failed leakage check! Invalidating score.")
+                return float('inf')
 
     return best_score
 
-def check_data_leakage(strategy_class, params, X_train, X_test, y_train, y_test):
+def check_data_leakage(strategy_class, params, X_train, X_test, y_train, y_test, model=None, preds_control=None):
     """
     Returns True if leakage detected, False otherwise.
     """
@@ -198,10 +200,11 @@ def check_data_leakage(strategy_class, params, X_train, X_test, y_train, y_test)
     has_leakage = False
     
     try:
-        # 1. Train Control Model
-        model = strategy_class(params=params)
-        model.fit(X_train, y_train)
-        preds_control = model.predict(X_test)
+        # 1. Prepare Control Prediction
+        if model is None or preds_control is None:
+            model = strategy_class(params=params)
+            model.fit(X_train, y_train)
+            preds_control = model.predict(X_test)
 
         # 2. Modify y_test in memory
         y_test_backup = y_test.copy()

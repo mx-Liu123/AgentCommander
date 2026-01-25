@@ -32,3 +32,8 @@ scripts/ml_autosetup_1/*
 *.npy
 *.png
 *.csv
+
+!control_panel.png
+!main_pic.png
+!progress_tree.png
+!workflow_editor.png

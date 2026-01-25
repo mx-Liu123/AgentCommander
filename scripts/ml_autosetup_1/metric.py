@@ -1,22 +1,26 @@
 import numpy as np
-from sklearn.metrics import mean_squared_error
 
 # --- Metric Configuration ---
-# Set this to True if the metric is like Accuracy (higher is better).
-# Set this to False if the metric is like MSE/Loss (lower is better).
+# MSE: Lower is better.
 HIGHER_IS_BETTER = False 
 
 def calculate_score(y_true, y_pred):
     """
-    Calculates the score for the given predictions.
-    
-    Args:
-        y_true: Ground truth values.
-        y_pred: Predicted values from the strategy.
-        
-    Returns:
-        float: The calculated score.
+    Calculates the Normalized Mean Squared Error (NMSE) per sample, then averages.
+    NMSE = sum((true - pred)^2) / sum(true^2)
     """
-    # Example: Mean Squared Error for Regression
-    # Since inputs might be (N, 1000), this calculates the average MSE across all dimensions.
-    return mean_squared_error(y_true, y_pred)
+    if y_true.shape != y_pred.shape:
+        raise ValueError(f"Shape mismatch: y_true {y_true.shape}, y_pred {y_pred.shape}")
+
+    epsilon = 1e-8
+    
+    # Flatten last dimensions, keep batch dimension
+    y_true_flat = y_true.reshape(y_true.shape[0], -1)
+    y_pred_flat = y_pred.reshape(y_pred.shape[0], -1)
+
+    error_energy = np.sum((y_true_flat - y_pred_flat) ** 2, axis=1)
+    true_energy = np.sum(y_true_flat ** 2, axis=1)
+    
+    nmse_per_sample = error_energy / (true_energy + epsilon)
+    
+    return np.mean(nmse_per_sample)
