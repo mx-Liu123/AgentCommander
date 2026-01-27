@@ -53,6 +53,8 @@ One of the primary challenges in autonomous coding agents is safety. We specific
     *   **Outer Control Plane (Evolutionary Strategy)**: Orchestrates the macro-level logic *between* experiments. This layer manages **lineage inheritance** (cloning and mutating the best strategies), **meta-learning** (extracting lessons from failed branches), and **external exploration** (injecting fresh ideas via web search), ensuring the system evolves continuously rather than just iterating blindly.
     *   **AI-Assisted Design**: Modify this complex topology directly via natural language commands (e.g., "Add a shell check after step 2").
 ![Workflow Editor](workflow_editor.png)
+*   **Visual Feedback Loop (Sub-Loop)**: Capable of **multimodal analysis**. If your experiment generates plots (e.g., `best_result.png`), the workflow can feed them back to vision-capable agents (via `@filename` syntax). This allows the AI to perform qualitative analysis—such as spotting overfitting or bias—and adjust its strategy accordingly.
+*   **Context-Aware File Explorer**: The built-in File Explorer features an embedded **AI Chat** that treats the currently open folder as its working directory. You can ask questions about your data ("Summarize history.json") and toggle **Read-Only Mode** for safe inspection.
 *   **Multi-Model CLI Integration**: Deeply integrated with both **Gemini CLI** and **Qwen CLI** for powerful, prompt-driven code generation and analysis. Choose the backend that best fits your needs directly from the UI.
 *   **Inherited CLI Skills**: Because it sits on top of the CLI ecosystem, AgentCommander inherits all the native capabilities of the underlying CLI tools. Any "skill" supported by Gemini/Qwen CLI (e.g., web search, file management, system commands) is automatically available to your agents within the workflow.
 *   **Infinite Iteration & Advanced Learning**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely. Advanced features like the **"Lesson" mechanism** (to learn from past errors) and **online search integration** (for inspiration) are available in example workflows to boost continuous improvement.
@@ -130,12 +132,28 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
     *   Click "Start Agent" to begin the automated experiment loop.
     *   Monitor progress in the "Console" and "Explorer" tabs.
 
+## Project Setup Wizard (Auto-Setup)
+
+For new projects, AgentCommander provides an **Auto-Setup Wizard** (`scripts/ml_autosetup_1/auto_setup.sh`) to instantly scaffold a robust experiment environment.
+
+1.  **Prepare Data**: Place your features and labels in a directory as `X.npy` and `Y.npy`.
+2.  **Run Wizard**: Execute `bash scripts/ml_autosetup_1/auto_setup.sh` and provide the path to your data directory when prompted.
+3.  **Automated Scaffolding**: The script will:
+    *   Split your data into development and reserved sets.
+    *   Generate a **strict "Judge" (`evaluator.py`)**: This script acts as an immutable referee, ensuring execution integrity and error handling while outsourcing all creative degrees of freedom to `strategy.py`.
+    *   Configure **Plugins**: Generates initial `metric.py` and `plot.py` which serve as non-modifiable plugins for the evaluator during the standard training flow.
+    *   **Auto-configure `config.json`**: Automatically sets the `root_dir`, `venv`, and visual configurations.
+4.  **One-Click Start**: Once the script finishes, simply launch the UI (`bash run_ui.sh`) and click **"Start Agent"**. Your workspace is already fully configured and ready to evolve.
+
 ## Reference Experiment Structure
 
 To help you get started, the `example/diabetes_sklearn/` directory provides a reference implementation for organizing your machine learning experiments. This structure is designed to be robust and prevent "cheating" by the LLM.
 
 ### 1. File Organization
-*   **Evaluation Script (`evaluator.py`)**: Placed within the experiment directory (e.g., `Branch_example/exp_example/evaluator.py`), this file serves as the ground truth for assessment. Since each experiment is self-contained, you can have different evaluation logic for different branches if needed. In strict mode, you should mark this file as read-only (default) or exclude it from the whitelist to prevent the agent from modifying it.
+*   **Evaluation Script (`evaluator.py`)**: Placed within the experiment directory (e.g., `Branch_example/exp_example/evaluator.py`), this file serves as the ground truth for assessment. 
+    *   **Anti-Leakage**: Our auto-setup template includes built-in checks to verify that the model does not modify the test set in memory, preventing common "cheating" bugs.
+    *   **Time Limits**: It also enforces **Soft and Hard Time Limits** to prevent infinite loops.
+    *   Since each experiment is self-contained, you can have different evaluation logic for different branches if needed. In strict mode, you should mark this file as read-only.
 *   **Seed Experiment Directory (`Branch_example/exp_example/`)**: This folder acts as the "seed" for your evolutionary tree. It contains the initial `strategy.py` (the model or logic to be improved) and any auxiliary files required for execution.
 *   **Experiment History (`history.json`)**: Within each experiment directory, `history.json` automatically stores all calculated metrics and the optimal results. The workflow can conveniently write key-value pairs into this file using the `write_history` module.
 
@@ -200,6 +218,7 @@ For "Strict", "Restricted (Whitelist)", and "Restricted (Blacklist)" modes, the 
 *   **Optimizing ML Parameter Search**: For a good balance between model iteration speed and computational cost, a duration of **20-30 minutes** for an `exp` directory coupled with ML parameter searching is often a cost-effective approach. This allows sufficient exploration without excessive expenditure.
 *   **Prompt Templating**: Within `llm_generate` nodes, you can use Jinja2-like templating syntax (e.g., `{{ variable_name }}`) to dynamically inject values from the shared context into your prompts. This is crucial for creating adaptive and data-driven agents.
 *   **Debugging Prompts with `gemini -r`**: After running your workflow, you can use the `gemini -r` command in the corresponding experiment directory (`cd {exp_path} && gemini -r`) to restore the latest conversation. This allows you to inspect the exact prompt that was sent to the LLM, verifying that your templating and context variables are working as expected.
+*   **CLI Hygiene & Isolation**: To prevent context pollution between different projects, consider setting your global CLI history file (e.g., `~/gemini/GEMINI.md` or similar) to **Read-Only** mode. This ensures that "Resume Latest" logic doesn't accidentally pull in memory from unrelated previous experiments, keeping each agent's evolution clean.
 
 ## Security Considerations & Disclaimer
 

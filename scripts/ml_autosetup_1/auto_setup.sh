@@ -28,6 +28,28 @@ echo "   Please make sure you have backed it up if needed."
 echo "------------------------------------"
 
 # ==============================================================================
+# 0. Initial Warning & Confirmation
+# ==============================================================================
+echo -e "\n[IMPORTANT] Workflow Evaluation Logic"
+echo "By default, this workflow executes evaluation in the 'Experiment Subloop'"
+echo "at node: '4. Run Evaluator' (ID: step4_eval)."
+echo ""
+echo "Default Command:"
+echo "--------------------------------------------------------------------------------"
+echo "cd {current_exp_path} && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\""
+echo "--------------------------------------------------------------------------------"
+echo ""
+echo "NOTE FOR SERVER/HPC USERS (e.g., QSUB, SLURM):"
+echo "If you need to submit jobs to compute nodes, you should modify the command in the"
+echo "Workflow Editor (step4_eval) to use a wrapper script that:"
+echo "  1. Submits the job (e.g., qsub run_job.sh)"
+echo "  2. WAITS for the job to complete (polling until done)"
+echo "  3. Prints the final output so the agent can parse 'Best metric: X.XXX'"
+echo ""
+read -p "Press [Enter] to confirm you understand this and continue setup..." dummy_var
+echo ""
+
+# ==============================================================================
 # 2. User Inputs
 # ==============================================================================
 
@@ -110,6 +132,8 @@ while true; do
     echo "Error: Metric description is mandatory. Please try again."
 done
 
+echo -e "\nTip: If your data is high-dimensional (e.g. 3D (N,T,D) or 4D images), please specify the shape here so AI chooses the right model (e.g. LSTM/CNN)."
+echo "Tip: You can also describe desired intermediate outputs for the model to expose. If there are no hint, the AI can also design on its own."
 read -p "Task Background (Optional): " TASK_BG_TEXT
 TASK_BG_TEXT=${TASK_BG_TEXT:-""}
 
@@ -333,7 +357,16 @@ try:
     
     task = os.environ.get('TASK_BG_TEXT', '')
     metric = os.environ.get('METRIC_TEXT', '')
-    sys_prompt = f\"You are an expert AI Data Scientist. Task: {task}. Metric: {metric}. Goal: Optimize strategy.py.\"
+    
+    # Enhanced System Prompt
+    sys_instruction = (
+        "1. You can improve by modifying Model Architecture (scale up/down), Hyperparameter Search (optimize search space), "
+        "and Training Process (epochs, optimizer, schedule, etc).\n"
+        "2. Add debug info and SAVE worst samples/predictions as .npy files for later analysis of failure cases.\n"
+        "3. Optimize for speed; avoid redundancy."
+    )
+    
+    sys_prompt = f\"You are an expert AI Data Scientist. Task: {task}. Metric: {metric}. Goal: Optimize strategy.py. \n{sys_instruction}\"
     data['global_vars']['DEFAULT_SYS'] = sys_prompt
 
     with open(config_path, 'w') as f:

@@ -287,7 +287,7 @@
                 "output_vars": [
                   "test_output"
                 ],
-                "timeout": 1200
+                "timeout": 12000
               },
               "id": "step4_eval",
               "label": "4. Run Evaluator",
@@ -299,7 +299,7 @@
             },
             {
               "config": {
-                "code": "\nimport re\nlogger.log(\"\ud83d\udc1b DEBUG: Step 4.5 Parse Metric Started\")\noutput = context.get('test_output', '')\nlogger.log(f'\ud83d\udc1b DEBUG: test_output length: {len(output)}')\nif len(output) < 200: logger.log(f'\ud83d\udc1b DEBUG: test_output content: {output}')\n\nmetric = None\ntry:\n    match = re.search(r\"Best metric:\\s*([\\d\\.]+)\", output)\n    if match:\n        metric = float(match.group(1))\n        logger.log(f'\ud83d\udc1b DEBUG: Matched Best metric: {metric}')\n    else:\n        logger.log(\"\ud83d\udc1b DEBUG: No 'Best metric' found.\")\nexcept Exception as e:\n    logger.log(f'\ud83d\udc1b DEBUG: Regex Error: {e}')\n\nif metric is None:\n    logger.log(\"\u26a0\ufe0f Could not parse metric. Setting current_metric to None.\")\n    context['current_metric'] = None # Explicitly set to None if not found\nelse:\n    context['current_metric'] = metric\n    logger.log(f'\u2705 Metric Parsed and Set: {metric}')\n"
+                "code": "\nimport re\nlogger.log(\"\ud83d\udc1b DEBUG: Step 4.5 Parse Metric Started\")\noutput = context.get('test_output', '')\nlogger.log(f'\ud83d\udc1b DEBUG: test_output length: {len(output)}')\nif len(output) < 200: logger.log(f'\ud83d\udc1b DEBUG: test_output content: {output}')\n\nmetric = None\ntry:\n    match = re.search(r\"Best metric:\\s*([-\\d\\.]+)\", output)\n    if match:\n        metric = float(match.group(1))\n        logger.log(f'\ud83d\udc1b DEBUG: Matched Best metric: {metric}')\n    else:\n        logger.log(\"\ud83d\udc1b DEBUG: No 'Best metric' found.\")\nexcept Exception as e:\n    logger.log(f'\ud83d\udc1b DEBUG: Regex Error: {e}')\n\nif metric is None:\n    logger.log(\"\u26a0\ufe0f Could not parse metric. Setting current_metric to None.\")\n    context['current_metric'] = None # Explicitly set to None if not found\nelse:\n    context['current_metric'] = metric\n    logger.log(f'\u2705 Metric Parsed and Set: {metric}')\n"
               },
               "id": "step4_5_parse",
               "label": "4.5 Parse Metric",
@@ -703,8 +703,8 @@
         "response_output": "hint_output",
         "session_id_input": "gemini_session_id",
         "session_mode": "inherit",
-        "timeout": 1200,
-        "user_template": "{DEFAULT_SYS}\nPrevious experiment records:\n{meta_lessons}\nPrevious web hint:\n{hint}\nresult plot: {plot_names}\n\nHuman: now, the current experiments have failed to achieve a breakthrough. Analyze the code in the current working directory and the history. Conduct a web search with your questions, making sure to use your networking tools. Optional sources include but are not limited to:\n1. View papers on Arxiv (HTML or PDF). Or use webfetch/GoogleSearch. Explain the inspiration combining with the original text.\n2. Look for discussions in online communities.\n3. Check GitHub for relevant repositories and explain the inspiration combining with the repository code.\n\nTask:\n1. Do detailed analysis and web research. \n2. Write a brainstorm text to guide future LLM experiments, ur plan must have a short reference to real online source (paper text,online discussion,or github original code) so that I can trace back. Do not repeat previous ideas.\n"
+        "timeout": 12000,
+        "user_template": "{DEFAULT_SYS}\nPrevious experiment records:\n{meta_lessons}\nPrevious web hint:\n{hint}\nresult plot: {plot_names}\n\nHuman: now, the current experiments have failed to achieve a breakthrough. Analyze the code in the current working directory and the history. Conduct a web search with your questions, making sure to use your networking tools. Optional sources include but are not limited to:\n1. View papers on Arxiv (HTML or PDF). Or use webfetch/GoogleSearch. Explain the inspiration combining with the original text.\n2. Look for discussions in online communities.\n3. Check GitHub for relevant repositories and explain the inspiration combining with the repository code.\n[important] Note that never run evaluator.py by yourself!\n\nTask:\n1. Do detailed analysis and web research. \n2. Write a brainstorm text to guide future LLM experiments, ur plan must have a short reference to real online source (paper text,online discussion,or github original code) so that I can trace back. Do not repeat previous ideas.\n"
       },
       "id": "meta_analysis_llm",
       "label": "Hint generation LLM",
@@ -754,16 +754,16 @@
       "type": "write_history"
     },
     {
+      "config": {
+        "code": "\nimport shutil\nfrom pathlib import Path\n\n# Only run this logic if we are at the very start of a new branch (L=1, S=1)\nif context.get('layer_idx') == 1 and context.get('sub_idx') == 1:\n    b_idx = context.get('branch_idx', 1)\n    p_path_str = context.get('next_parent_path')\n    \n    if p_path_str:\n        src = Path(p_path_str)\n        if src.exists():\n            # Define destination: BranchX/expX.0.0\n            branch_dir = service.tasks_dir / f\"Branch{b_idx}\"\n            branch_dir.mkdir(parents=True, exist_ok=True)\n            \n            init_exp_name = f\"exp{b_idx}.0.0\"\n            dest = branch_dir / init_exp_name\n            \n            if not dest.exists():\n                logger.log(f\"\ud83d\udccb [Init] Copying Parent {src.name} -> {init_exp_name}...\")\n                try:\n                    # Copy tree\n                    shutil.copytree(src, dest, dirs_exist_ok=True)\n                    \n                    # Update context to use this new 0.0 as the parent for 1.1\n                    context['next_parent_path'] = str(dest)\n                    logger.log(f\"\u2705 [Init] Created Base Experiment: {dest}\")\n                    \n                    # Optional: Mark history to say it's a clone\n                    h_path = dest / 'history.json'\n                    if h_path.exists():\n                        try:\n                            with open(h_path, 'r') as f: h = json.load(f)\n                            h['note'] = 'Copied as Branch Base (expB.0.0)'\n                            with open(h_path, 'w') as f: json.dump(h, f, indent=2)\n                        except: pass\n                        \n                except Exception as e:\n                    logger.error(f\"\u274c [Init] Failed to copy init exp: {e}\")\n            else:\n                logger.log(f\"\u2139\ufe0f [Init] Base {init_exp_name} exists. Using it as parent.\")\n                context['next_parent_path'] = str(dest)\n        else:\n            logger.log(f\"\u26a0\ufe0f [Init] Parent path not found: {src}\")\n"
+      },
       "id": "copy_init_exp",
-      "type": "python_script",
       "label": "Copy Init Exp (expB.0.0)",
       "position": {
         "x": 400,
         "y": 200
       },
-      "config": {
-        "code": "\nimport shutil\nfrom pathlib import Path\n\n# Only run this logic if we are at the very start of a new branch (L=1, S=1)\nif context.get('layer_idx') == 1 and context.get('sub_idx') == 1:\n    b_idx = context.get('branch_idx', 1)\n    p_path_str = context.get('next_parent_path')\n    \n    if p_path_str:\n        src = Path(p_path_str)\n        if src.exists():\n            # Define destination: BranchX/expX.0.0\n            branch_dir = service.tasks_dir / f\"Branch{b_idx}\"\n            branch_dir.mkdir(parents=True, exist_ok=True)\n            \n            init_exp_name = f\"exp{b_idx}.0.0\"\n            dest = branch_dir / init_exp_name\n            \n            if not dest.exists():\n                logger.log(f\"\ud83d\udccb [Init] Copying Parent {src.name} -> {init_exp_name}...\")\n                try:\n                    # Copy tree\n                    shutil.copytree(src, dest, dirs_exist_ok=True)\n                    \n                    # Update context to use this new 0.0 as the parent for 1.1\n                    context['next_parent_path'] = str(dest)\n                    logger.log(f\"\u2705 [Init] Created Base Experiment: {dest}\")\n                    \n                    # Optional: Mark history to say it's a clone\n                    h_path = dest / 'history.json'\n                    if h_path.exists():\n                        try:\n                            with open(h_path, 'r') as f: h = json.load(f)\n                            h['note'] = 'Copied as Branch Base (expB.0.0)'\n                            with open(h_path, 'w') as f: json.dump(h, f, indent=2)\n                        except: pass\n                        \n                except Exception as e:\n                    logger.error(f\"\u274c [Init] Failed to copy init exp: {e}\")\n            else:\n                logger.log(f\"\u2139\ufe0f [Init] Base {init_exp_name} exists. Using it as parent.\")\n                context['next_parent_path'] = str(dest)\n        else:\n            logger.log(f\"\u26a0\ufe0f [Init] Parent path not found: {src}\")\n"
-      }
+      "type": "python_script"
     }
   ]
 }
