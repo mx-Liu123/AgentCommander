@@ -80,15 +80,15 @@ def call_llm(prompt, session_id=None, timeout=None, model=None, cwd=None, yolo=T
             else:
                 cmd.extend(["--resume", "latest"]) # Gemini explicitly uses --resume latest
                 
-            cmd.extend(["-p", prompt])
+            # Changed to stdin to avoid E2BIG
             if yolo: cmd.append("-y")
-            run_kwargs["input"] = ""
+            run_kwargs["input"] = prompt
         else:
             # Resume specific session
             cmd.extend(["--resume", session_id])
-            cmd.extend(["-p", prompt])
+            # Changed to stdin to avoid E2BIG
             if yolo: cmd.append("-y")
-            run_kwargs["input"] = ""
+            run_kwargs["input"] = prompt
     else:
         # New session: Pass prompt via stdin
         if yolo: cmd.append("-y")
