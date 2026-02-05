@@ -17,7 +17,7 @@ import agent_service
 # Setup Flask
 app = Flask(__name__, template_folder='templates')
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
 
 # Global State
 agent_process = None
