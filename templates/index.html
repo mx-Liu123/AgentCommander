@@ -158,14 +158,13 @@
                     <div v-if="currentTab === 'control'">
                         <div class="card p-3 mb-3">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="m-0">Control Panel</h5>
+                                <h5 class="m-0">Control Panel <small class="text-muted" style="font-size: 0.7rem;">(Save Config to apply & persist changes)</small></h5>
                                 <button class="btn btn-sm btn-outline-info" @click="startTour('control')">❓ Tutorial</button>
                             </div>
                             <div class="mb-3" id="tour-cp-root">
                                 <label>Root Directory</label>
                                 <div class="input-group">
                                     <input type="text" class="form-control" v-model="taskRoot">
-                                    <button class="btn btn-outline-secondary" @click="updateTaskRoot">Update Root</button>
                                 </div>
                             </div>
                             <div class="row g-3" id="tour-cp-mode">
