@@ -45,6 +45,8 @@ One of the primary challenges in autonomous coding agents is safety. We specific
 
 *   **Sandboxing**: Unlike other agent frameworks (e.g., Claude Code) where file system isolation can be difficult to enforce, the CLI-based approach allows AgentCommander to strictly limit the agent's read/write access to specific experiment directories. This ensures that the agent can freely experiment within its sandbox without risking modifications to your system-level files.
 *   **Transparent Debugging (White-box)**: A major pain point with many agent frameworks is their "black-box" nature—if the agent gets stuck, you can't easily see why. In AgentCommander, every experiment runs in its own folder. You can simply `cd` into any experiment directory and run `gemini -r` (or `qwen -c`) to **resume the conversation exactly where the agent left off**. This gives you complete transparency and control to inspect the agent's thought process or manually intervene.
+*   **HPC/PBS Server Support**: Beyond local execution, AgentCommander now supports high-performance clusters. The `example/pbs_server_example_tasks/` directory provides templates for PBS scripts (`run_all.pbs`) and job monitoring (`watch_job.sh`), specifically optimized and tested on the **NUS Vanda server**. These are integrated into the `pylib/pbs_example_graph.json` workflow.
+    *   **Usage**: To use this, copy `pylib/pbs_example_graph.json` to `pylib/.cache/current_graph.json` to override the default workflow. Then, in the Control Panel UI, switch the experiment root directory to `example/pbs_server_example_tasks/`.
 
 ## Key Features
 
