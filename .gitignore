@@ -1,10 +1,11 @@
 backup_ui.sh
 config.json
-config_v1_crypto.json
-config_v1_quant.json
 example/code_polish/
 example/diabetes_sklearn/config_v1.json
 example/diabetes_sklearn/Branch1/
+example/pbs_server_example_tasks/Branch1/
+branch1/
+Branch1/
 example/diabetes_sklearn/__pycache__/
 example/diabetes_sklearn/.backup_branch_example/
 example/diabetes_sklearn/my_workflows/
@@ -32,6 +33,7 @@ scripts/ml_autosetup_1/*
 *.npy
 *.png
 *.csv
+run_all_merged*
 
 !control_panel.png
 !main_pic.png

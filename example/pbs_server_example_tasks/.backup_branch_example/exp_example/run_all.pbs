@@ -1,0 +1,56 @@
+#!/bin/bash
+#PBS -N run_all_merged
+#PBS -l walltime=05:00:00
+#PBS -l select=1:ncpus=36:mpiprocs=1:ompthreads=36:mem=250gb:ngpus=1
+#PBS -q auto
+
+cd $PBS_O_WORKDIR
+
+source ~/.bashrc
+module load singularity
+
+image=/app1/common/singularity-img/hopper/cuda/cuda_12.1.0-cudnn8-devel-u20.04.sif
+
+singularity exec $image bash << 'EOF' > stdout.run_all 2> stderr.run_all
+source ~/.bashrc
+
+# modify ur conda env here
+if command -v conda >/dev/null 2>&1; then
+    source activate gbgpu_env10 || conda activate gbgpu_env10
+fi
+
+
+export JOB_SHM_DIR="/dev/shm/$PBS_JOBID"
+echo "Creating RAM checkpoint dir: $JOB_SHM_DIR"
+mkdir -p $JOB_SHM_DIR
+
+# no need python -u strategy.py in example
+echo "========================================================"
+echo ">>> STEP 1: RUNNING STRATEGY (TRAINING)"
+echo "========================================================"
+#python -u strategy.py
+#if [ $? -ne 0 ]; then
+#	    echo "❌ Training failed. Aborting evaluation."
+#	        # rm -rf $JOB_SHM_DIR
+#		    exit 1
+#fi
+
+echo ""
+echo "========================================================"
+echo ">>> STEP 2: RUNNING EVALUATOR (INFERENCE)"
+echo "========================================================"
+python -u evaluator.py ./strategy.py
+
+echo ""
+echo "✅ All steps completed."
+
+#example part to move model weights from node to local
+#if [ "$SAVE_LOCAL" == "1" ]; then
+#    echo ">>> Copying checkpoint back to local disk (SAVE_LOCAL=1)..."
+#    mkdir -p ./checkpoints_phase_tx_realisation
+#    cp $JOB_SHM_DIR/best_fast.pt ./checkpoints_phase_tx_realisation/
+#fi
+
+echo "Skipping cleanup of RAM dir ($JOB_SHM_DIR) as requested."
+# rm -rf $JOB_SHM_DIR
+EOF

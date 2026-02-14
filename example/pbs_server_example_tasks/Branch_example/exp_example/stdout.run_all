@@ -1,0 +1,12 @@
+Creating RAM checkpoint dir: /dev/shm/564020.stdct-mgmt-02
+========================================================
+>>> STEP 1: RUNNING STRATEGY (TRAINING)
+========================================================
+
+========================================================
+>>> STEP 2: RUNNING EVALUATOR (INFERENCE)
+========================================================
+Usage: python evaluator.py <path_to_strategy.py>
+
+✅ All steps completed.
+Skipping cleanup of RAM dir (/dev/shm/564020.stdct-mgmt-02) as requested.
