@@ -144,6 +144,29 @@ def call_llm(prompt, session_id=None, timeout=None, model=None, cwd=None, yolo=T
         else:
             return parse_gemini_output(stdout, session_id)
 
+    except OSError as e:
+        if e.errno == 7: # Argument list too long
+            sys.stderr.write(f"\n⚠️ [Robustness] Caught E2BIG (Arg list too long). Retrying with truncated prompt...\n")
+            
+            # 1. Print Debug Info
+            p_len = len(prompt)
+            preview = prompt[:500] + "\n...[MIDDLE OMITTED]...\n" + prompt[-500:]
+            sys.stderr.write(f"Original Prompt Length: {p_len}\n")
+            sys.stderr.write(f"Original Prompt Preview:\n{preview}\n")
+            
+            # 2. Safety Break
+            if p_len < 4000:
+                raise RuntimeError(f"❌ Failed even with small prompt ({p_len}). E2BIG error persists: {e}")
+                
+            # 3. Truncate (Remove last 10% or at least 2000 chars)
+            cut_size = max(2000, int(p_len * 0.1))
+            new_prompt = prompt[:-cut_size] + "\n...[TRUNCATED_BY_CLIENT_DUE_TO_E2BIG]..."
+            
+            # 4. Retry Recursive
+            return call_llm(new_prompt, session_id, timeout, model, cwd, yolo)
+        else:
+            raise e
+
     except subprocess.TimeoutExpired:
         err_msg = f"❌ {binary.upper()} Call Timed Out after {timeout}s"
         print(err_msg)
