@@ -1,8 +1,32 @@
 #!/bin/bash
 
-# ==============================================================================
-# ML Project Auto-Setup Wizard
-# ==============================================================================
+# <GEMINI_UI_CONFIG>
+# {
+#   "name": "ML Auto-Setup (Standard)",
+#   "description": "Full-stack ML experiment setup: Data splitting, Strategy/Metric generation via AI, and initial evaluation.",
+#   "inputs": [
+#     {"id": "PROJECT_NAME", "label": "Project Name", "type": "text", "default": "my_new_experiment", "tooltip": "Folder name to create"},
+#     {"id": "DATA_DIR", "label": "Data Directory", "type": "text", "default": "/home/liumx/data/diabetes", "tooltip": "Absolute path containing X.npy and Y.npy"},
+#     {"id": "VENV_PYTHON", "label": "Python Interpreter", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python"},
+#     {"id": "RESERVED_RATIO", "label": "Reserved Data Ratio", "type": "number", "default": 0.05},
+#     {"id": "TEST_SET_RATIO", "label": "Test Set Ratio", "type": "number", "default": 0.2},
+#     {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s)", "type": "number", "default": 600},
+#     {"id": "HARD_LIMIT", "label": "Hard Time Limit (s)", "type": "number", "default": 900},
+#     {"id": "USER_SEED", "label": "Random Seed", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
+#     {"id": "METRIC_TEXT", "label": "Metric Description", "type": "textarea", "default": "Use sklearn.metrics.accuracy_score.", "rows": 2},
+#     {"id": "TASK_BG_TEXT", "label": "Task Background", "type": "textarea", "default": "Tabular classification.", "rows": 2},
+#     {"id": "MODEL_HINT_TEXT", "label": "Model Hints", "type": "textarea", "default": "Suggest using Random Forest or XGBoost.", "rows": 2}
+#   ],
+#   "preview_steps": [
+#     "1. Environment Check & Confirmation",
+#     "2. Create Directory Structure",
+#     "3. Data Splitting",
+#     "4. AI Code Generation (Strategy, Metric, Plot)",
+#     "5. Validation & Dry Run",
+#     "6. Update config.json"
+#   ]
+# }
+# </GEMINI_UI_CONFIG>
 
 # 1. Locate Source Files (Assumes script is in the same dir as templates)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -23,122 +47,139 @@ done
 echo "=== ML Project Auto-Setup Wizard ==="
 echo "Date: $(date)"
 echo "------------------------------------"
-echo "⚠️  WARNING: This script will OVERWRITE/UPDATE 'config.json' in the current directory."
-echo "   Please make sure you have backed it up if needed."
-echo "------------------------------------"
 
 # ==============================================================================
-# 0. Initial Warning & Confirmation
+# 0. Initial Warning & Confirmation (Skipped if NON_INTERACTIVE is set)
 # ==============================================================================
-echo -e "\n[IMPORTANT] Workflow Evaluation Logic"
-echo "By default, this workflow executes evaluation in the 'Experiment Subloop'"
-echo "at node: '4. Run Evaluator' (ID: step4_eval)."
-echo ""
-echo "Default Command:"
-echo "--------------------------------------------------------------------------------"
-echo "cd {current_exp_path} && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\""
-echo "--------------------------------------------------------------------------------"
-echo ""
-echo "NOTE FOR SERVER/HPC USERS (e.g., QSUB, SLURM):"
-echo "If you need to submit jobs to compute nodes, you should modify the command in the"
-echo "Workflow Editor (step4_eval) to use a wrapper script that:"
-echo "  1. Submits the job (e.g., qsub run_job.sh)"
-echo "  2. WAITS for the job to complete (polling until done)"
-echo "  3. Prints the final output so the agent can parse 'Best metric: X.XXX'"
-echo ""
-read -p "Press [Enter] to confirm you understand this and continue setup..." dummy_var
-echo ""
+if [ -z "$NON_INTERACTIVE" ]; then
+    echo "⚠️  WARNING: This script will OVERWRITE/UPDATE 'config.json' in the current directory."
+    echo "------------------------------------"
+    echo -e "\n[IMPORTANT] Workflow Evaluation Logic"
+    echo "By default, this workflow executes evaluation in the 'Experiment Subloop'"
+    echo "at node: '4. Run Evaluator' (ID: step4_eval)."
+    echo ""
+    echo "Default Command:"
+    echo "--------------------------------------------------------------------------------"
+    echo "cd {current_exp_path} && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\""
+    echo "--------------------------------------------------------------------------------"
+    echo ""
+    echo "NOTE FOR SERVER/HPC USERS (e.g., QSUB, SLURM):"
+    echo "If you need to submit jobs to compute nodes, you should modify the command in the"
+    echo "Workflow Editor (step4_eval) to use a wrapper script that:"
+    echo "  1. Submits the job (e.g., qsub run_job.sh)"
+    echo "  2. WAITS for the job to complete (polling until done)"
+    echo "  3. Prints the final output so the agent can parse 'Best metric: X.XXX'"
+    echo ""
+    read -p "Press [Enter] to confirm you understand this and continue setup..." dummy_var
+    echo ""
+else
+    echo "ℹ️  Running in Non-Interactive Mode (UI Automation)"
+fi
 
 # ==============================================================================
-# 2. User Inputs
+# 2. User Inputs (Environment Variable Priority)
 # ==============================================================================
 
-while true; do
-    read -p "[REQUIRED] Project Name (e.g., my_new_experiment): " PROJECT_NAME
-    if [ -n "$PROJECT_NAME" ]; then break; fi
-    echo "Error: Project name is mandatory. Please try again."
-done
+# Helper function to get input if variable is not set
+get_input() {
+    local var_name=$1
+    local prompt=$2
+    local default=$3
+    local current_val=${!var_name}
 
-while true; do
-    echo -e "\n[REQUIRED] Enter the ABSOLUTE path to the Data Directory."
-    read -p "Data Directory (must contain X.npy and Y.npy): " DATA_DIR
-    if [ -z "$DATA_DIR" ]; then
-        echo "Error: Data directory is mandatory."
-        continue
+    if [ -z "$current_val" ]; then
+        if [ -n "$default" ]; then
+             read -p "$prompt [Default: $default]: " user_val
+             if [ -z "$user_val" ]; then
+                 eval "$var_name=\"$default\""
+             else
+                 eval "$var_name=\"$user_val\""
+             fi
+        else
+             while true; do
+                 read -p "$prompt: " user_val
+                 if [ -n "$user_val" ]; then
+                     eval "$var_name=\"$user_val\""
+                     break
+                 fi
+                 echo "Error: This field is mandatory."
+             done
+        fi
+    else
+        echo "$prompt: $current_val (Loaded from Env)"
     fi
-    
-    # Expand ~ to $HOME
-    if [[ "$DATA_DIR" == "~"* ]]; then
-        DATA_DIR="${DATA_DIR/#\~/$HOME}"
-    fi
+}
 
-    # Resolve absolute path
-    # Handle tilde expansion manually
-    if [[ "$DATA_DIR" == ~* ]]; then
-        DATA_DIR="${DATA_DIR/#\~/$HOME}"
-    fi
-    
+get_input "PROJECT_NAME" "[REQUIRED] Project Name (e.g., my_new_experiment)" ""
+
+# Special handling for DATA_DIR validation
+if [ -z "$DATA_DIR" ]; then
+    while true; do
+        echo -e "\n[REQUIRED] Enter the ABSOLUTE path to the Data Directory."
+        read -p "Data Directory (must contain X.npy and Y.npy): " DATA_DIR
+        # Validation Logic...
+        if [[ "$DATA_DIR" == "~"* ]]; then DATA_DIR="${DATA_DIR/#\~/$HOME}"; fi
+        if [[ "$DATA_DIR" == ~* ]]; then DATA_DIR="${DATA_DIR/#\~/$HOME}"; fi
+        DATA_DIR=$(realpath "$DATA_DIR" 2>/dev/null)
+        
+        if [ -z "$DATA_DIR" ] || [ ! -d "$DATA_DIR" ]; then
+            echo "Error: Invalid path: $DATA_DIR"
+            DATA_DIR="" # Reset to loop
+            continue
+        fi
+        if [ ! -f "$DATA_DIR/X.npy" ] || [ ! -f "$DATA_DIR/Y.npy" ]; then
+            echo "Error: Missing X.npy or Y.npy in $DATA_DIR"
+            DATA_DIR=""
+            continue
+        fi
+        break
+    done
+else
+    # Env Var set, validate it once
+    echo "Data Directory: $DATA_DIR (Loaded from Env)"
+    if [[ "$DATA_DIR" == "~"* ]]; then DATA_DIR="${DATA_DIR/#\~/$HOME}"; fi
     DATA_DIR=$(realpath "$DATA_DIR" 2>/dev/null)
-    
-    if [ -z "$DATA_DIR" ] || [ ! -d "$DATA_DIR" ]; then
-        echo "Error: Directory does not exist or invalid path: $DATA_DIR"
-        continue
+    if [ ! -d "$DATA_DIR" ] || [ ! -f "$DATA_DIR/X.npy" ]; then
+        echo "❌ Error: Invalid DATA_DIR from environment: $DATA_DIR"
+        exit 1
     fi
-    
-    if [ ! -f "$DATA_DIR/X.npy" ] || [ ! -f "$DATA_DIR/Y.npy" ]; then
-        echo "Error: Could not find X.npy or Y.npy in $DATA_DIR"
-        echo "Please run your extraction script first."
-        continue
-    fi
-    break
-done
+fi
 
 DEFAULT_VENV="/home/$USER/.conda/envs/agent_commander/bin/python"
-read -p "Python Interpreter Path [Default: $DEFAULT_VENV]: " VENV_PYTHON
-VENV_PYTHON=${VENV_PYTHON:-$DEFAULT_VENV}
+get_input "VENV_PYTHON" "Python Interpreter Path" "$DEFAULT_VENV"
 
 DEFAULT_RESERVED=0.05
-read -p "Reserved Data Ratio (0-1) [Default: $DEFAULT_RESERVED]: " RESERVED_RATIO
-RESERVED_RATIO=${RESERVED_RATIO:-$DEFAULT_RESERVED}
+get_input "RESERVED_RATIO" "Reserved Data Ratio (0-1)" "$DEFAULT_RESERVED"
 
 echo -e "\n--- Evaluation Config ---"
 DEFAULT_TEST_RATIO=0.2
-read -p "Internal Test Set Ratio (0-1) [Default: $DEFAULT_TEST_RATIO]: " TEST_SET_RATIO
-TEST_SET_RATIO=${TEST_SET_RATIO:-$DEFAULT_TEST_RATIO}
+get_input "TEST_SET_RATIO" "Internal Test Set Ratio (0-1)" "$DEFAULT_TEST_RATIO"
 
 DEFAULT_SOFT=600
-read -p "Soft Time Limit (seconds) [Default: $DEFAULT_SOFT]: " SOFT_LIMIT
-SOFT_LIMIT=${SOFT_LIMIT:-$DEFAULT_SOFT}
+get_input "SOFT_LIMIT" "Soft Time Limit (seconds)" "$DEFAULT_SOFT"
 
 DEFAULT_HARD=900
-read -p "Hard Time Limit (seconds) [Default: $DEFAULT_HARD]: " HARD_LIMIT
-HARD_LIMIT=${HARD_LIMIT:-$DEFAULT_HARD}
+get_input "HARD_LIMIT" "Hard Time Limit (seconds)" "$DEFAULT_HARD"
 
 # Random Seed Logic
 DEFAULT_SEED=42
-read -p "Random Seed (Press Enter for $DEFAULT_SEED, or type 'random' for random): " USER_SEED
+if [ -z "$USER_SEED" ]; then
+    read -p "Random Seed (Press Enter for $DEFAULT_SEED, or type 'random' for random): " USER_SEED
+fi
 if [ "$USER_SEED" == "random" ]; then
     RANDOM_SEED=$RANDOM
     echo "Using generated random seed: $RANDOM_SEED"
 else
     RANDOM_SEED=${USER_SEED:-$DEFAULT_SEED}
+    echo "Random Seed: $RANDOM_SEED"
 fi
 
 echo -e "\n--- AI Instructions ---"
-while true; do
-    echo "Please describe the Metric Function (REQUIRED). Check metric.py later."
-    read -p "[REQUIRED] Metric Description: " METRIC_TEXT
-    if [ -n "$METRIC_TEXT" ]; then break; fi
-    echo "Error: Metric description is mandatory. Please try again."
-done
+get_input "METRIC_TEXT" "[REQUIRED] Metric Description" ""
 
-echo -e "\nTip: If your data is high-dimensional (e.g. 3D (N,T,D) or 4D images), please specify the shape here so AI chooses the right model (e.g. LSTM/CNN)."
-echo "Tip: You can also describe desired intermediate outputs for the model to expose. If there are no hint, the AI can also design on its own."
-read -p "Task Background (Optional): " TASK_BG_TEXT
-TASK_BG_TEXT=${TASK_BG_TEXT:-""}
-
-read -p "Model/Strategy Hint (Optional): " MODEL_HINT_TEXT
-MODEL_HINT_TEXT=${MODEL_HINT_TEXT:-""}
+echo -e "\nTip: Task Background..."
+get_input "TASK_BG_TEXT" "Task Background (Optional)" ""
+get_input "MODEL_HINT_TEXT" "Model/Strategy Hint (Optional)" ""
 
 # ==============================================================================
 # 3. Directory Structure & File Copying

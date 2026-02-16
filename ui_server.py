@@ -5,6 +5,8 @@ import glob
 import multiprocessing
 import queue
 import base64
+import subprocess
+import threading
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
@@ -21,9 +23,129 @@ socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
 
 # Global State
 agent_process = None
+script_process = None # For running auxiliary scripts
 log_queue = multiprocessing.Queue()
 stop_event = multiprocessing.Event()
 recent_logs = []
+
+# ... (Existing Code) ...
+
+def scan_scripts_with_config(root_dir):
+    """Scans for .sh files with <GEMINI_UI_CONFIG> block."""
+    scripts = []
+    try:
+        # Search recursively for .sh files in scripts/
+        search_path = Path(root_dir) / "scripts"
+        if not search_path.exists(): return []
+        
+        for path in search_path.rglob("*.sh"):
+            try:
+                content = path.read_text(encoding='utf-8')
+                start_marker = "# <GEMINI_UI_CONFIG>"
+                end_marker = "# </GEMINI_UI_CONFIG>"
+                
+                s_idx = content.find(start_marker)
+                e_idx = content.find(end_marker)
+                
+                if s_idx != -1 and e_idx != -1:
+                    json_block = content[s_idx + len(start_marker):e_idx]
+                    # Remove leading comments '#'
+                    clean_json = "\n".join([line.lstrip('#').strip() for line in json_block.splitlines()])
+                    
+                    config = json.loads(clean_json)
+                    config['path'] = str(path.relative_to(root_dir))
+                    scripts.append(config)
+            except Exception as e:
+                print(f"Error parsing script {path}: {e}")
+                
+    except Exception as e:
+        print(f"Error scanning scripts: {e}")
+        
+    return scripts
+
+def script_runner_thread(cmd, env_vars, cwd):
+    """Runs a script and pipes output to socketio."""
+    global script_process
+    
+    # Merge env
+    full_env = os.environ.copy()
+    full_env.update(env_vars)
+    full_env["NON_INTERACTIVE"] = "1"
+    
+    try:
+        # Use Popen to capture output in real-time
+        # Use pty to force line buffering (optional, but subprocess usually buffers)
+        # For simplicity, use standard PIPE and iterate lines
+        process = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            env=full_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, # Merge stderr to stdout
+            text=True,
+            bufsize=1 # Line buffered
+        )
+        script_process = process
+        
+        socketio.emit('script_status', {'status': 'running', 'pid': process.pid})
+        
+        for line in process.stdout:
+            socketio.emit('script_log', {'data': line})
+            
+        process.wait()
+        rc = process.returncode
+        
+        if rc == 0:
+            socketio.emit('script_log', {'data': '\n✅ Script finished successfully.\n'})
+            socketio.emit('script_status', {'status': 'completed', 'code': 0})
+        else:
+            socketio.emit('script_log', {'data': f'\n❌ Script failed with exit code {rc}.\n'})
+            socketio.emit('script_status', {'status': 'error', 'code': rc})
+            
+    except Exception as e:
+        socketio.emit('script_log', {'data': f'\n❌ Script execution error: {e}\n'})
+        socketio.emit('script_status', {'status': 'error'})
+    finally:
+        script_process = None
+
+@app.route('/api/scripts/list', methods=['GET'])
+def list_scripts_api():
+    return jsonify(scan_scripts_with_config(CURRENT_ROOT_DIR))
+
+@app.route('/api/scripts/run', methods=['POST'])
+def run_script_api():
+    global script_process
+    if script_process and script_process.poll() is None:
+         return jsonify({"error": "A script is already running"}), 400
+         
+    data = request.json
+    script_rel_path = data.get('path')
+    env_vars = data.get('env', {})
+    
+    if not script_rel_path: return jsonify({"error": "Path required"}), 400
+    
+    script_path = (Path(CURRENT_ROOT_DIR) / script_rel_path).resolve()
+    if not script_path.exists(): return jsonify({"error": "Script not found"}), 404
+    
+    # Security Check
+    if str(Path(CURRENT_ROOT_DIR).resolve()) not in str(script_path):
+         return jsonify({"error": "Access denied"}), 403
+
+    # Start Background Thread
+    cmd = ["bash", str(script_path)]
+    thread = threading.Thread(target=script_runner_thread, args=(cmd, env_vars, CURRENT_ROOT_DIR))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"status": "started"})
+
+@app.route('/api/scripts/stop', methods=['POST'])
+def stop_script_api():
+    global script_process
+    if script_process and script_process.poll() is None:
+        script_process.terminate()
+        return jsonify({"status": "terminated"})
+    return jsonify({"status": "no_process"})
 
 # Default root dir
 CURRENT_ROOT_DIR = os.path.join(os.getcwd(), 'Find_Transform')

@@ -113,6 +113,7 @@
                     <h4 class="mb-4 text-primary">Agent Commander</h4>
                     <div class="nav flex-column nav-pills">
                         <button class="nav-link" :class="{active: currentTab==='control'}" @click="currentTab='control'">🤖 Control Panel</button>
+                        <button class="nav-link" :class="{active: currentTab==='setup'}" @click="currentTab='setup'; loadScripts()">🛠️ Experiment Setup</button>
                         <button class="nav-link" :class="{active: currentTab==='explorer'}" @click="currentTab='explorer'">📁 File Explorer</button>
                         <button class="nav-link" :class="{active: currentTab==='workflow'}" @click="currentTab='workflow'">⚙️ Workflow Editor</button>
                         <button class="nav-link" :class="{active: currentTab==='viz'}" @click="currentTab='viz'; renderViz();">🌳 Progress Tree</button>
@@ -121,7 +122,11 @@
                     <div>
                         <small class="text-muted">Status:</small><br>
                         <span :class="{'text-success': isRunning, 'text-secondary': !isRunning}">
-                            {{ isRunning ? '● Running' : '○ Idle' }}
+                            {{ isRunning ? '● Agent Running' : '○ Agent Idle' }}
+                        </span>
+                        <br>
+                        <span :class="{'text-info': scriptRunning, 'text-secondary': !scriptRunning}">
+                            {{ scriptRunning ? '● Script Running' : '○ Script Idle' }}
                         </span>
                     </div>
 
@@ -239,10 +244,92 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="console-box" id="console">
-                            <div v-for="(log, i) in logs" :key="i" :class="{'log-error': log.type === 'error'}">
-                                <span class="text-muted">[{{ log.time }}]</span> {{ log.data }}
+                    </div>
+
+                    <div v-if="currentTab === 'setup'">
+                        <div class="row h-100">
+                            <!-- Left Column: Configuration -->
+                            <div class="col-md-7 d-flex flex-column h-100">
+                                <div class="card bg-dark border-secondary mb-3 flex-shrink-0">
+                                    <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                                        <h5 class="m-0 text-light">🛠️ Experiment Setup</h5>
+                                        <button class="btn btn-sm btn-outline-info" @click="loadScripts">↻ Refresh Scripts</button>
+                                    </div>
+                                    <div class="card-body">
+                                        <label class="form-label text-muted small uppercase fw-bold">Select Script Template</label>
+                                        <select class="form-select bg-dark text-light border-secondary mb-3" v-model="selectedScriptIndex" @change="onScriptSelect">
+                                            <option v-for="(script, idx) in scriptsList" :value="idx">
+                                                {{ script.name }} ({{ script.path }})
+                                            </option>
+                                        </select>
+                                        
+                                        <div v-if="selectedScript">
+                                            <p class="text-muted small mb-3">{{ selectedScript.description }}</p>
+                                            
+                                            <!-- Dynamic Form -->
+                                            <div class="setup-form-container" style="max-height: 50vh; overflow-y: auto; padding-right: 5px;">
+                                                <div v-for="field in selectedScript.inputs" :key="field.id" class="mb-3">
+                                                    <label class="form-label small text-light mb-1">
+                                                        {{ field.label }}
+                                                        <span v-if="field.tooltip" class="text-muted ms-1" :title="field.tooltip">ℹ️</span>
+                                                    </label>
+                                                    
+                                                    <!-- Text Input -->
+                                                    <input v-if="field.type === 'text' || field.type === 'path'" type="text" 
+                                                           class="form-control form-control-sm bg-dark text-light border-secondary"
+                                                           v-model="scriptForm[field.id]" :placeholder="field.default">
+                                                           
+                                                    <!-- Number Input -->
+                                                    <input v-if="field.type === 'number'" type="number" 
+                                                           class="form-control form-control-sm bg-dark text-light border-secondary"
+                                                           v-model.number="scriptForm[field.id]" :placeholder="field.default">
+                                                           
+                                                    <!-- Textarea -->
+                                                    <textarea v-if="field.type === 'textarea'" 
+                                                              class="form-control form-control-sm bg-dark text-light border-secondary"
+                                                              v-model="scriptForm[field.id]" rows="3" :placeholder="field.default"></textarea>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div v-else class="text-center text-muted p-5">
+                                            Select a script to configure.
+                                        </div>
+                                    </div>
+                                    <div class="card-footer border-secondary">
+                                        <button class="btn btn-success w-100" @click="runScript" :disabled="!selectedScript || scriptRunning">
+                                            <span v-if="scriptRunning" class="spinner-border spinner-border-sm me-2"></span>
+                                            {{ scriptRunning ? 'Running...' : '🚀 Run Setup Script' }}
+                                        </button>
+                                        <button v-if="scriptRunning" class="btn btn-danger w-100 mt-2" @click="stopScript">🛑 Stop Script</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Right Column: Preview & Console -->
+                            <div class="col-md-5 d-flex flex-column h-100">
+                                <!-- Steps Preview -->
+                                <div class="card bg-dark border-secondary mb-3 flex-shrink-0" v-if="selectedScript && selectedScript.preview_steps">
+                                    <div class="card-header border-secondary py-2">
+                                        <small class="text-muted fw-bold">EXECUTION PLAN</small>
+                                    </div>
+                                    <ul class="list-group list-group-flush bg-dark">
+                                        <li v-for="(step, idx) in selectedScript.preview_steps" :key="idx" 
+                                            class="list-group-item bg-dark text-light border-secondary py-1 small">
+                                            {{ step }}
+                                        </li>
+                                    </ul>
+                                </div>
+                                
+                                <!-- Script Console -->
+                                <div class="card bg-dark border-secondary flex-grow-1 d-flex flex-column" style="min-height: 0;">
+                                    <div class="card-header border-secondary py-2 d-flex justify-content-between align-items-center">
+                                        <small class="text-muted fw-bold">SCRIPT CONSOLE</small>
+                                        <button class="btn btn-sm btn-outline-secondary py-0" @click="scriptLogs=[]">Clear</button>
+                                    </div>
+                                    <div class="card-body p-0 bg-black flex-grow-1" style="overflow-y: auto; font-family: 'Consolas', monospace;" id="script-console">
+                                        <div v-for="(log, i) in scriptLogs" :key="i" class="px-2 py-0 text-light small" style="white-space: pre-wrap;">{{ log }}</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -804,6 +891,93 @@
                 const explorerChatMinimized = ref(true);
                 const explorerChatContainer = ref(null);
                 const explorerChatYolo = ref(false);
+
+                // --- SCRIPT RUNNER STATE ---
+                const scriptRunning = ref(false);
+                const scriptLogs = ref([]);
+                const scriptsList = ref([]);
+                const selectedScriptIndex = ref(null);
+                const selectedScript = ref(null);
+                const scriptForm = ref({});
+                const scriptConsoleRef = ref(null);
+
+                const loadScripts = async () => {
+                    try {
+                        const res = await fetch('/api/scripts/list');
+                        if (res.ok) {
+                            scriptsList.value = await res.json();
+                            // If only one, select it
+                            if (scriptsList.value.length === 1) {
+                                selectedScriptIndex.value = 0;
+                                onScriptSelect();
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error loading scripts:", e);
+                    }
+                };
+
+                const onScriptSelect = () => {
+                    if (selectedScriptIndex.value === null) return;
+                    selectedScript.value = scriptsList.value[selectedScriptIndex.value];
+                    scriptForm.value = {};
+                    // Pre-fill defaults
+                    if (selectedScript.value.inputs) {
+                        selectedScript.value.inputs.forEach(f => {
+                            scriptForm.value[f.id] = f.default;
+                        });
+                    }
+                };
+
+                const runScript = async () => {
+                    if (!selectedScript.value) return;
+                    scriptRunning.value = true;
+                    scriptLogs.value = ["🚀 Starting script..."];
+                    
+                    try {
+                        const res = await fetch('/api/scripts/run', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                path: selectedScript.value.path,
+                                env: scriptForm.value
+                            })
+                        });
+                        
+                        if (!res.ok) {
+                            const err = await res.json();
+                            scriptLogs.value.push(`❌ Error starting: ${err.error}`);
+                            scriptRunning.value = false;
+                        }
+                    } catch (e) {
+                        scriptLogs.value.push(`❌ Network Error: ${e.message}`);
+                        scriptRunning.value = false;
+                    }
+                };
+
+                const stopScript = async () => {
+                    try {
+                        await fetch('/api/scripts/stop', { method: 'POST' });
+                        scriptLogs.value.push("🛑 Stop requested...");
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+                
+                socket.on('script_log', (msg) => {
+                    if (msg.data) {
+                        scriptLogs.value.push(msg.data);
+                        nextTick(() => {
+                            const el = document.getElementById('script-console');
+                            if (el) el.scrollTop = el.scrollHeight;
+                        });
+                    }
+                });
+
+                socket.on('script_status', (msg) => {
+                    if (msg.status === 'running') scriptRunning.value = true;
+                    else if (msg.status === 'completed' || msg.status === 'error') scriptRunning.value = false;
+                });
 
                 const expandText = (content, fieldKey) => {
                      previewFile.value = { 
@@ -1911,6 +2085,8 @@
 
                 return {
                     currentTab, isRunning, logs, config, taskRoot, explorerRoot, isAtRoot, fileList, availableBranches,
+                    scriptRunning, scriptLogs, scriptsList, selectedScriptIndex, selectedScript, scriptForm,
+                    loadScripts, runScript, stopScript, onScriptSelect,
                     graphStack, currentGraph, pan, zoom, selectedNode, selectedEdge, dragEdge,
                     loadWorkflowFromCache, navToLevel, nodeDblClick,
                     dragStart, onDrop, onMouseDown, onMouseMove, onMouseUp, 
