@@ -319,6 +319,21 @@
                                         </li>
                                     </ul>
                                 </div>
+
+                                <!-- System Intro -->
+                                <div class="card bg-dark border-secondary mb-3 flex-shrink-0" v-if="selectedScript && selectedScript.system_intro">
+                                    <div class="card-header border-secondary py-2">
+                                        <small class="text-muted fw-bold">SYSTEM OVERVIEW</small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div v-for="(line, idx) in selectedScript.system_intro" :key="idx" 
+                                             class="text-light small mb-1" :class="{'fw-bold text-info': line.endsWith(':'), 'ms-2': !line.endsWith(':') && line.trim() !== ''}"
+                                             style="font-family: 'Segoe UI', sans-serif;">
+                                            {{ line }}
+                                            <br v-if="line.trim() === ''">
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <!-- Script Console -->
                                 <div class="card bg-dark border-secondary flex-grow-1 d-flex flex-column" style="min-height: 0;">

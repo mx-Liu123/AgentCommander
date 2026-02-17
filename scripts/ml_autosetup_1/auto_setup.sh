@@ -2,8 +2,8 @@
 
 # <GEMINI_UI_CONFIG>
 # {
-#   "name": "ML Auto-Setup (Standard)",
-#   "description": "Full-stack ML experiment setup: Data splitting, Strategy/Metric generation via AI, and initial evaluation.",
+#   "name": "[Case: You only have Dataset] ML Auto-Setup",
+#   "description": "[Case: Single Dataset] Full-stack ML experiment setup: Data splitting, Strategy/Metric generation via AI, and initial evaluation.",
 #   "inputs": [
 #     {"id": "TARGET_ROOT_DIR", "label": "Target Root Directory (Where to create project)", "type": "text", "default": ".", "tooltip": "'.' = AgentCommander Root. Use absolute path for others."},
 #     {"id": "PROJECT_NAME", "label": "Project Name (e.g., my_new_experiment)", "type": "text", "default": "my_new_experiment", "tooltip": "Folder name to create"},
@@ -11,8 +11,8 @@
 #     {"id": "VENV_PYTHON", "label": "Python Interpreter Path", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python"},
 #     {"id": "RESERVED_RATIO", "label": "Reserved Data Ratio (0-1)", "type": "number", "default": 0.05},
 #     {"id": "TEST_SET_RATIO", "label": "Test Set Ratio (0-1)", "type": "number", "default": 0.2},
-#     {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s) [Suggested max time per trial, guides search pruning]", "type": "number", "default": 600},
-#     {"id": "HARD_LIMIT", "label": "Hard Time Limit (s) [Force kill timeout per trial. Exceeding this = Failure]", "type": "number", "default": 900},
+#     {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s) [Per Eval: No new searches start after this, but current trial finishes]", "type": "number", "default": 600},
+#     {"id": "HARD_LIMIT", "label": "Hard Time Limit (s) [Per Eval: Kill immediately if exceeded, mark as Failure]", "type": "number", "default": 900},
 #     {"id": "USER_SEED", "label": "Random Seed (Number or 'random')", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
 #     {"id": "METRIC_TEXT", "label": "Metric Description (Defines calculate_score. System auto-converts to 'Lower is Better' e.g. via negative sign)", "type": "textarea", "default": "MSE", "rows": 2},
 #     {"id": "TASK_BG_TEXT", "label": "Task Background (Optional, e.g. LSTM/CNN for 3D/4D data)", "type": "textarea", "default": "GW PTA wave to phase", "rows": 2},
@@ -22,9 +22,20 @@
 #     "1. Environment Check & Confirmation",
 #     "2. Create Directory Structure",
 #     "3. Data Splitting",
-#     "4. AI Code Generation (Strategy, Metric, Plot)",
+#     "4. AI Code Generation (Strategy, Metric, Plot). Note: evaluator.py is a fixed template to ensure evaluation correctness.",
 #     "5. Validation & Dry Run",
 #     "6. Update config.json"
+#   ],
+#   "system_intro": [
+#     "DATA REQUIREMENTS:",
+#     "• X.npy: Shape (N, ...). N = samples. Supports arbitrary tensor dimensions (e.g. features, time steps).",
+#     "• Y.npy: Shape (N, ...). Must match N samples in X.",
+#     "",
+#     "SYSTEM ARCHITECTURE:",
+#     "• evaluator.py (JUDGE): Orchestrates parameter search using strategy.py. IMMUTABLE by Agent. Includes built-in anti-cheating checks.",
+#     "• strategy.py (PLAYER): The model/strategy logic. High freedom for Agent to optimize and refactor.",
+#     "• metric.py (RULER): Defines the score calculation. Read-Only for Agent. Adjustable by Human.",
+#     "• plot.py (VISUALIZER): Generates visual feedback. Read-Only for Agent. Adjustable by Human."
 #   ]
 # }
 # </GEMINI_UI_CONFIG>
@@ -274,16 +285,48 @@ echo "Evaluator Hash (Baseline): $EVAL_HASH_START"
 # 6. AI Generation Loop
 # ==============================================================================
 
+RETRY_COUNT=0
+LAST_ERROR_LOG=""
+
 while true; do
     echo -e "\n========================================"
     echo "   Starting AI Code Generation..."
     echo "========================================"
 
-    # --- Step 5: Strategy Generation ---
-    echo "[Gemini] Generating Strategy..."
-    PROMPT_STRATEGY="We are creating a working directory for an Agent. $EXP_DIR/evaluator.py is the judge, and $EXP_DIR/strategy.py is the contestant. Analyze the structure of both. Task Background: $TASK_BG_TEXT. Do NOT modify evaluator.py. Model Hints: $MODEL_HINT_TEXT. **IMPORTANT: Completely ignore the original logic of strategy.py and refactor it entirely based on the task background.** Now modify the model at $EXP_DIR/strategy.py. Ensure you keep: def get_search_configs():, class Strategy: def __init__(self, params=None):, def fit(self, X, y):, def predict(self, X):"
+    # --- Reset Evaluator (Ensure pristine state before AI gen) ---
+    # Copy fresh template
+    cp "$EVALUATOR_SCRIPT" "$EXP_DIR/"
+    TARGET_EVAL="$EXP_DIR/evaluator.py"
     
-    gemini -y "$PROMPT_STRATEGY"
+    # Re-apply configurations
+    sed -i "s|^DATA_DIR = .*|DATA_DIR = \"$DATA_DIR\"|" "$TARGET_EVAL"
+    sed -i "s/^TEST_SIZE = .*/TEST_SIZE = $TEST_SET_RATIO/" "$TARGET_EVAL"
+    sed -i "s/soft_limit_seconds = .*/soft_limit_seconds = $SOFT_LIMIT/" "$TARGET_EVAL"
+    sed -i "s/hard_limit_seconds = .*/hard_limit_seconds = $HARD_LIMIT/" "$TARGET_EVAL"
+    sed -i "s/^RANDOM_SEED = .*/RANDOM_SEED = $RANDOM_SEED/" "$TARGET_EVAL"
+    
+    # Update Hash Baseline
+    if command -v md5sum &> /dev/null; then
+        EVAL_HASH_START=$(md5sum "$TARGET_EVAL" | awk '{print $1}')
+    fi
+
+    # --- Step 5: Strategy Generation ---
+    echo "[Gemini] Generating Strategy (Attempt $((RETRY_COUNT+1)))..."
+    
+    EXTRA_INSTRUCTION=""
+    RESUME_FLAG=""
+    
+    if [ $RETRY_COUNT -gt 0 ]; then
+        RESUME_FLAG="--resume latest"
+        if [ -n "$LAST_ERROR_LOG" ]; then
+            # Escape potential special chars in error log if needed, or rely on simple quoting
+            EXTRA_INSTRUCTION="PREVIOUS ATTEMPT FAILED. Here is the error log from the previous run:\n----------------\n$LAST_ERROR_LOG\n----------------\n\nPLEASE FIX THE CODE BASED ON THIS ERROR. Ensure you output the COMPLETE corrected file content."
+        fi
+    fi
+
+    PROMPT_STRATEGY="We are creating a working directory for an Agent. $EXP_DIR/evaluator.py is the judge, and $EXP_DIR/strategy.py is the contestant. Analyze the structure of both. Task Background: $TASK_BG_TEXT. Do NOT modify evaluator.py. Model Hints: $MODEL_HINT_TEXT. **IMPORTANT: Completely ignore the original logic of strategy.py and refactor it entirely based on the task background.** Now modify the model at $EXP_DIR/strategy.py. Ensure you keep: def get_search_configs():, class Strategy: def __init__(self, params=None):, def fit(self, X, y):, def predict(self, X):. $EXTRA_INSTRUCTION"
+    
+    gemini -y $RESUME_FLAG "$PROMPT_STRATEGY"
 
     # --- Step 6: Metric Generation ---
     echo "[Gemini] Generating Metric..."
@@ -362,8 +405,15 @@ except Exception as e:
     cd - > /dev/null # Go back to root
 
     if [ "${DRY_RUN_EXIT_CODE:-1}" -eq 0 ]; then
-        echo "✅ Dry Run Successful."
+        echo "✅ Dry Run Successful (Exit Code 0)."
         echo "$DRY_RUN_OUT" | grep "Best Metric"
+        
+        # Check for inf score
+        if echo "$DRY_RUN_OUT" | grep -q "Best Metric: inf"; then
+             echo "❌ Critical: Metric is INF (Infinite). Marking as failure."
+             HAS_ERROR=1
+        fi
+
         # Check for plot output
         echo "$DRY_RUN_OUT" | grep "PLOT_GENERATED"
     else
@@ -379,14 +429,27 @@ except Exception as e:
     # ==============================================================================
 
     if [ $HAS_ERROR -eq 1 ]; then
-        echo -e "\n⚠️  Errors were detected during generation or validation."
-        read -p "Do you want to retry the AI generation steps (5-7)? [Y/n] " RETRY_CHOICE
-        RETRY_CHOICE=${RETRY_CHOICE:-Y}
-        if [[ "$RETRY_CHOICE" =~ ^[Nn]$ ]]; then
+        if [ $RETRY_COUNT -lt 5 ]; then
+            RETRY_COUNT=$((RETRY_COUNT+1))
+            echo "⚠️  Errors detected. Auto-retrying ($RETRY_COUNT/5) with error feedback..."
+            
+            # Capture error log for feedback
+            LAST_ERROR_LOG=$(echo "$DRY_RUN_OUT" | tail -n 50)
+            
+            sleep 2
+            continue
+        else
+            echo -e "\n❌ Auto-retry failed 5 times."
+            echo "----------------------------------------------------------------------"
+            echo "[SUGGESTION]"
+            echo "1. Review the error logs above carefully for code or environment issues."
+            echo "2. Verify your Data (X.npy, Y.npy) is not corrupted and contains valid values."
+            echo "3. Check if your Python Interpreter Path and dependencies are correct."
+            echo "4. You can try to run the Setup again with more specific Model Hints."
+            echo "----------------------------------------------------------------------"
             echo "Exiting with errors."
             break
         fi
-        # Loop continues
     else
         echo -e "\n🎉 Setup and initial verification complete! No obvious bugs found."
         echo "Work directory: $EXP_DIR"
