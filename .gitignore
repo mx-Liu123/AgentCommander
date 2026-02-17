@@ -10,6 +10,7 @@ example/diabetes_sklearn/__pycache__/
 example/diabetes_sklearn/.backup_branch_example/
 example/diabetes_sklearn/my_workflows/
 my_workflows/
+my_new_experiment/
 __pycache__/
 .ipynb_checkpoints/
 test_place/

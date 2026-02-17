@@ -5,17 +5,18 @@
 #   "name": "ML Auto-Setup (Standard)",
 #   "description": "Full-stack ML experiment setup: Data splitting, Strategy/Metric generation via AI, and initial evaluation.",
 #   "inputs": [
-#     {"id": "PROJECT_NAME", "label": "Project Name", "type": "text", "default": "my_new_experiment", "tooltip": "Folder name to create"},
-#     {"id": "DATA_DIR", "label": "Data Directory", "type": "text", "default": "/home/liumx/data/diabetes", "tooltip": "Absolute path containing X.npy and Y.npy"},
-#     {"id": "VENV_PYTHON", "label": "Python Interpreter", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python"},
-#     {"id": "RESERVED_RATIO", "label": "Reserved Data Ratio", "type": "number", "default": 0.05},
-#     {"id": "TEST_SET_RATIO", "label": "Test Set Ratio", "type": "number", "default": 0.2},
-#     {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s)", "type": "number", "default": 600},
-#     {"id": "HARD_LIMIT", "label": "Hard Time Limit (s)", "type": "number", "default": 900},
-#     {"id": "USER_SEED", "label": "Random Seed", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
-#     {"id": "METRIC_TEXT", "label": "Metric Description", "type": "textarea", "default": "Use sklearn.metrics.accuracy_score.", "rows": 2},
-#     {"id": "TASK_BG_TEXT", "label": "Task Background", "type": "textarea", "default": "Tabular classification.", "rows": 2},
-#     {"id": "MODEL_HINT_TEXT", "label": "Model Hints", "type": "textarea", "default": "Suggest using Random Forest or XGBoost.", "rows": 2}
+#     {"id": "TARGET_ROOT_DIR", "label": "Target Root Directory (Where to create project)", "type": "text", "default": ".", "tooltip": "'.' = AgentCommander Root. Use absolute path for others."},
+#     {"id": "PROJECT_NAME", "label": "Project Name (e.g., my_new_experiment)", "type": "text", "default": "my_new_experiment", "tooltip": "Folder name to create"},
+#     {"id": "DATA_DIR", "label": "Data Directory (Absolute path, must contain X.npy and Y.npy)", "type": "text", "default": "~/test_data/", "tooltip": "Absolute path containing X.npy and Y.npy"},
+#     {"id": "VENV_PYTHON", "label": "Python Interpreter Path", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python"},
+#     {"id": "RESERVED_RATIO", "label": "Reserved Data Ratio (0-1)", "type": "number", "default": 0.05},
+#     {"id": "TEST_SET_RATIO", "label": "Test Set Ratio (0-1)", "type": "number", "default": 0.2},
+#     {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s) [Suggested max time per trial, guides search pruning]", "type": "number", "default": 600},
+#     {"id": "HARD_LIMIT", "label": "Hard Time Limit (s) [Force kill timeout per trial. Exceeding this = Failure]", "type": "number", "default": 900},
+#     {"id": "USER_SEED", "label": "Random Seed (Number or 'random')", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
+#     {"id": "METRIC_TEXT", "label": "Metric Description (Defines calculate_score. System auto-converts to 'Lower is Better' e.g. via negative sign)", "type": "textarea", "default": "MSE", "rows": 2},
+#     {"id": "TASK_BG_TEXT", "label": "Task Background (Optional, e.g. LSTM/CNN for 3D/4D data)", "type": "textarea", "default": "GW PTA wave to phase", "rows": 2},
+#     {"id": "MODEL_HINT_TEXT", "label": "Model/Strategy Hint (Optional)", "type": "textarea", "default": "with cnn+LSTM?", "rows": 2}
 #   ],
 #   "preview_steps": [
 #     "1. Environment Check & Confirmation",
@@ -88,7 +89,15 @@ get_input() {
     local current_val=${!var_name}
 
     if [ -z "$current_val" ]; then
-        if [ -n "$default" ]; then
+        if [ -n "$NON_INTERACTIVE" ]; then
+             if [ -n "$default" ]; then
+                 eval "$var_name=\"$default\""
+                 echo "$prompt: $default (Default used in Non-Interactive mode)"
+             else
+                 echo "❌ Error: Required field '$var_name' is missing in Non-Interactive mode."
+                 exit 1
+             fi
+        elif [ -n "$default" ]; then
              read -p "$prompt [Default: $default]: " user_val
              if [ -z "$user_val" ]; then
                  eval "$var_name=\"$default\""
@@ -109,6 +118,29 @@ get_input() {
         echo "$prompt: $current_val (Loaded from Env)"
     fi
 }
+
+# ==============================================================================
+# 1.5. Navigate to Target Root
+# ==============================================================================
+get_input "TARGET_ROOT_DIR" "Target Root Directory" "."
+
+if [ -n "$TARGET_ROOT_DIR" ]; then
+    if [ "$TARGET_ROOT_DIR" == "." ]; then
+        if [ -n "$AGENT_APP_ROOT" ]; then
+            echo "[Setup] Switching to AgentCommander Root: $AGENT_APP_ROOT"
+            cd "$AGENT_APP_ROOT" || exit 1
+        else
+            echo "[Setup] Staying in current directory (CLI mode)"
+        fi
+    else
+        # Expand tilde if present
+        if [[ "$TARGET_ROOT_DIR" == "~"* ]]; then TARGET_ROOT_DIR="${TARGET_ROOT_DIR/#\~/$HOME}"; fi
+        
+        echo "[Setup] Switching to Target Root: $TARGET_ROOT_DIR"
+        mkdir -p "$TARGET_ROOT_DIR"
+        cd "$TARGET_ROOT_DIR" || exit 1
+    fi
+fi
 
 get_input "PROJECT_NAME" "[REQUIRED] Project Name (e.g., my_new_experiment)" ""
 
@@ -249,19 +281,19 @@ while true; do
 
     # --- Step 5: Strategy Generation ---
     echo "[Gemini] Generating Strategy..."
-    PROMPT_STRATEGY="解释我们正在制作一个给 Agent 的工作目录。 我们的 $EXP_DIR/evaluator.py 是个裁判， 然后选手是 $EXP_DIR/strategy.py，写一下这两个文件的结构, 然后任务背景是: $TASK_BG_TEXT。绝对不可以修改 evaluator.py。 模型的提示：$MODEL_HINT_TEXT。 现在修改模型，在 $EXP_DIR/strategy.py, 注意保留 def get_search_configs():，class Strategy: def __init__(self, params=None):，def fit(self, X, y):，def predict(self, X):"
+    PROMPT_STRATEGY="We are creating a working directory for an Agent. $EXP_DIR/evaluator.py is the judge, and $EXP_DIR/strategy.py is the contestant. Analyze the structure of both. Task Background: $TASK_BG_TEXT. Do NOT modify evaluator.py. Model Hints: $MODEL_HINT_TEXT. **IMPORTANT: Completely ignore the original logic of strategy.py and refactor it entirely based on the task background.** Now modify the model at $EXP_DIR/strategy.py. Ensure you keep: def get_search_configs():, class Strategy: def __init__(self, params=None):, def fit(self, X, y):, def predict(self, X):"
     
     gemini -y "$PROMPT_STRATEGY"
 
     # --- Step 6: Metric Generation ---
     echo "[Gemini] Generating Metric..."
-    PROMPT_METRIC="提示：$METRIC_TEXT， 现在修改 $EXP_DIR/metric.py"
+    PROMPT_METRIC="Hint: $METRIC_TEXT. Now modify $EXP_DIR/metric.py."
     
     gemini -y --resume latest "$PROMPT_METRIC"
     
     # --- Step 7: Plot Generation (New) ---
     echo "[Gemini] Generating Plot Visualization..."
-    PROMPT_PLOT="我们增加了一个可视化插件 $EXP_DIR/plot.py。请根据任务背景 '$TASK_BG_TEXT' 和指标 '$METRIC_TEXT' 修改这个文件。要求：1. 只画一张最能代表模型效果的图（如预测vs真实值，或混淆矩阵）。2. 图表必须清晰美观。3. 保存文件名为 best_result.png（或根据任务命名）。4. 不要调用 plt.show()，只保存。5. 函数签名必须是 draw_plots(X_test, y_test, y_pred, output_dir, params) 并返回文件名列表。"
+    PROMPT_PLOT="We added a visualization plugin at $EXP_DIR/plot.py. Based on Task Background '$TASK_BG_TEXT' and Metric '$METRIC_TEXT', modify this file. Requirements: 1. Draw only ONE plot that best represents model performance (e.g., Pred vs True, or Confusion Matrix). 2. Plot must be clear and professional. 3. Save as 'best_result.png'. 4. Do NOT call plt.show(), only save. 5. Function signature MUST be 'draw_plots(X_test, y_test, y_pred, output_dir, params)' and return a list of filenames."
     
     gemini -y --resume latest "$PROMPT_PLOT"
 
@@ -297,9 +329,13 @@ while true; do
     # 9. Dry Run
     echo "[Validation] performing dry run..."
     cd "$EXP_DIR" || exit
+    
+    # Create temp file for capturing output while streaming
+    DRY_RUN_LOG=$(mktemp)
+
     # Run a quick check using python -c. We assume evaluate returns a float (score) or raises error.
-    # We use a subshell to not affect current dir
-    DRY_RUN_OUT=$("$VENV_PYTHON" -c "
+    # We use tee to show output in real-time while capturing it.
+    "$VENV_PYTHON" -u -c "
 import sys
 try:
     from evaluator import evaluate
@@ -307,15 +343,25 @@ try:
     # We pass the strategy filename
     score = evaluate('strategy.py')
     print(f'Dry Run Success. Best Metric: {score}')
+    # Check if plot was generated (evaluator usually prints something or we check file)
+    import os
+    if os.path.exists('best_result.png'):
+        print('PLOT_GENERATED: best_result.png found.')
 except Exception as e:
     print(f'Dry Run Failed: {e}')
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
-" 2>&1)
+" 2>&1 | tee "$DRY_RUN_LOG"
     
-    DRY_RUN_EXIT_CODE=$?
+    # Capture exit code of the first command in pipe (python)
+    DRY_RUN_EXIT_CODE=${PIPESTATUS[0]}
+    DRY_RUN_OUT=$(cat "$DRY_RUN_LOG")
+    rm "$DRY_RUN_LOG"
+
     cd - > /dev/null # Go back to root
 
-    if [ $DRY_RUN_EXIT_CODE -eq 0 ]; then
+    if [ "${DRY_RUN_EXIT_CODE:-1}" -eq 0 ]; then
         echo "✅ Dry Run Successful."
         echo "$DRY_RUN_OUT" | grep "Best Metric"
         # Check for plot output
@@ -373,7 +419,7 @@ export PLOT_OUTPUT
 export TASK_BG_TEXT
 export METRIC_TEXT
 
-python3 -c "
+python3 - <<'EOF'
 import json
 import os
 
@@ -392,7 +438,8 @@ try:
     if 'global_vars' not in data: data['global_vars'] = {}
 
     # Update Fields
-    data['root_dir'] = f\"./{os.environ['PROJECT_NAME']}\"
+    # Using os.environ to get exported bash variables
+    data['root_dir'] = f"./{os.environ['PROJECT_NAME']}"
     data['global_vars']['venv'] = os.environ['VENV_PYTHON']
     data['global_vars']['plot_names'] = os.environ.get('PLOT_OUTPUT', '')
     
@@ -407,14 +454,14 @@ try:
         "3. Optimize for speed; avoid redundancy."
     )
     
-    sys_prompt = f\"You are an expert AI Data Scientist. Task: {task}. Metric: {metric}. Goal: Optimize strategy.py. \n{sys_instruction}\"
+    sys_prompt = f"You are an expert AI Data Scientist. Task: {task}. Metric: {metric}. Goal: Optimize strategy.py. \n{sys_instruction}"
     data['global_vars']['DEFAULT_SYS'] = sys_prompt
 
     with open(config_path, 'w') as f:
         json.dump(data, f, indent=2)
-    print(f'✅ config.json updated successfully. Root: {data[\"root_dir\"]}')
+    print(f"✅ config.json updated successfully. Root: {data['root_dir']}")
 except Exception as e:
-    print(f'❌ Failed to update config.json: {e}')
-"
+    print(f"❌ Failed to update config.json: {e}")
+EOF
 
 echo "Done."

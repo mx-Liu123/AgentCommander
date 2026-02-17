@@ -34,32 +34,47 @@ def scan_scripts_with_config(root_dir):
     """Scans for .sh files with <GEMINI_UI_CONFIG> block."""
     scripts = []
     try:
-        # Search recursively for .sh files in scripts/
-        search_path = Path(root_dir) / "scripts"
-        if not search_path.exists(): return []
+        # We always scan from the APP_ROOT/scripts to ensure consistency
+        search_path = Path(os.getcwd()) / "scripts"
+        if not search_path.exists(): 
+            print(f"Debug: scripts folder not found at {search_path}")
+            return []
         
         for path in search_path.rglob("*.sh"):
             try:
                 content = path.read_text(encoding='utf-8')
-                start_marker = "# <GEMINI_UI_CONFIG>"
-                end_marker = "# </GEMINI_UI_CONFIG>"
+                start_marker = "<GEMINI_UI_CONFIG>"
+                end_marker = "</GEMINI_UI_CONFIG>"
                 
                 s_idx = content.find(start_marker)
                 e_idx = content.find(end_marker)
                 
                 if s_idx != -1 and e_idx != -1:
+                    # Extract everything between markers
                     json_block = content[s_idx + len(start_marker):e_idx]
-                    # Remove leading comments '#'
-                    clean_json = "\n".join([line.lstrip('#').strip() for line in json_block.splitlines()])
                     
+                    # Clean lines: remove leading '#' and whitespace
+                    lines = []
+                    for line in json_block.splitlines():
+                        # Remove leading '#' if present, then strip whitespace
+                        clean_line = line.strip()
+                        if clean_line.startswith('#'):
+                            clean_line = clean_line[1:].strip()
+                        if clean_line:
+                            lines.append(clean_line)
+                    
+                    clean_json = "".join(lines)
                     config = json.loads(clean_json)
-                    config['path'] = str(path.relative_to(root_dir))
+                    
+                    # Store path relative to project root for execution
+                    config['path'] = os.path.relpath(str(path), os.getcwd())
                     scripts.append(config)
+                    print(f"✅ Loaded script config: {config['name']} from {config['path']}")
             except Exception as e:
-                print(f"Error parsing script {path}: {e}")
+                print(f"❌ Error parsing script {path}: {e}")
                 
     except Exception as e:
-        print(f"Error scanning scripts: {e}")
+        print(f"❌ Error scanning scripts: {e}")
         
     return scripts
 
@@ -69,8 +84,12 @@ def script_runner_thread(cmd, env_vars, cwd):
     
     # Merge env
     full_env = os.environ.copy()
-    full_env.update(env_vars)
+    
+    # Ensure all env vars are strings (subprocess requires string values)
+    clean_env_vars = {k: str(v) for k, v in env_vars.items()}
+    full_env.update(clean_env_vars)
     full_env["NON_INTERACTIVE"] = "1"
+    full_env["AGENT_APP_ROOT"] = os.getcwd() # Inject App Root for scripts to reference
     
     try:
         # Use Popen to capture output in real-time
@@ -124,14 +143,19 @@ def run_script_api():
     
     if not script_rel_path: return jsonify({"error": "Path required"}), 400
     
-    script_path = (Path(CURRENT_ROOT_DIR) / script_rel_path).resolve()
-    if not script_path.exists(): return jsonify({"error": "Script not found"}), 404
+    # Scripts are always relative to the APP ROOT (where ui_server.py is), not the task root
+    script_path = (Path(os.getcwd()) / script_rel_path).resolve()
     
-    # Security Check
-    if str(Path(CURRENT_ROOT_DIR).resolve()) not in str(script_path):
-         return jsonify({"error": "Access denied"}), 403
+    if not script_path.exists(): 
+        print(f"Debug: Script not found at {script_path}")
+        return jsonify({"error": f"Script not found at {script_path}"}), 404
+    
+    # Security Check: Script must be within app root
+    if str(Path(os.getcwd()).resolve()) not in str(script_path):
+         return jsonify({"error": "Access denied: Script outside project root"}), 403
 
     # Start Background Thread
+    # We still run the script inside CURRENT_ROOT_DIR so it creates files in the right place
     cmd = ["bash", str(script_path)]
     thread = threading.Thread(target=script_runner_thread, args=(cmd, env_vars, CURRENT_ROOT_DIR))
     thread.daemon = True
