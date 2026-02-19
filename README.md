@@ -4,6 +4,8 @@
 
 **Automating the loop of discovery.**
 
+[![Documentation](https://img.shields.io/badge/📖_Docs-Read_Now-green?style=for-the-badge&logo=gitbook)](https://mx-Liu123.github.io/AgentCommander/)
+
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Gemini CLI](https://img.shields.io/badge/Powered%20by-Gemini%20CLI-8E75B2)](https://ai.google.dev/)

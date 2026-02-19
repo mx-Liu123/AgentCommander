@@ -1,7 +1,8 @@
 site_name: AgentCommander
 site_description: Automating the loop of scientific discovery with AI Agents.
+site_url: https://mx-Liu123.github.io/AgentCommander/
 site_author: AgentCommander Team
-repo_url: https://github.com/yourusername/AgentCommander
+repo_url: https://github.com/mx-Liu123/AgentCommander
 edit_uri: edit/main/docs/
 
 theme:
