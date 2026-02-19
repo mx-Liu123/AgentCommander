@@ -29,6 +29,23 @@ Qwen offers an "OpenAI-compatible, OAuth free tier" which provides ~2,000 free r
 2.  Follow the OAuth flow.
 3.  This is excellent for long-running evolutionary tasks where token costs on other platforms might be prohibitive.
 
+## OpenCode AI
+
+An open-source oriented backend.
+
+*   **Installation**: `npm install -g opencode-ai`
+*   **Configuration**: Run `opencode login` to authenticate.
+
+## Claude Code (Anthropic)
+
+Integration with Anthropic's official CLI.
+
+*   **Installation**: `npm install -g @anthropic-ai/claude-code`
+*   **Configuration**:
+    1.  Run `claude login`.
+    2.  This will open a browser window to authenticate with your Anthropic Console account.
+    3.  Grant permission to the CLI.
+
 ## Common Issues
 
 ### "Model not found"

@@ -8,6 +8,8 @@
         *   *Tip*: Enable "Gemini Preview" in settings to access Pro 1.5/Flash 2.0 models.
     *   [Qwen CLI](https://github.com/qwen-cli): `npm install -g @qwen/cli`
         *   *Tip*: Qwen offers a free tier via OAuth.
+    *   **OpenCode AI**: `npm install -g opencode-ai`
+    *   **Claude Code**: `npm install -g @anthropic-ai/claude-code`
 
 ## Installation
 
