@@ -6,7 +6,9 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Gemini CLI](https://img.shields.io/badge/Powered%20by-Gemini%20CLI-8E75B2)](https://ai.google.dev/)
 
-AgentCommander is an advanced, **graph-based workflow execution engine** designed to orchestrate AI Agents for complex, iterative scientific tasks. Built on top of the **Gemini CLI**, it enables Machine Learning engineers to construct highly customizable, infinite-loop workflows.
+**AgentCommander was born from the actual demands of scientific research.**
+
+Refined through rigorous practical application, it is a graph-based workflow engine designed to orchestrate AI Agents for complex, iterative tasks. Built to leverage the diverse ecosystem of **LLM CLIs** (Gemini, Qwen, Claude, etc.), it enables Machine Learning engineers to construct highly customizable, infinite-loop workflows.
 
 ## Philosophy: Human-Centric Evolution
 

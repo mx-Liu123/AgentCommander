@@ -26,7 +26,9 @@ AgentCommander fills this gap. It is built on the belief that repetitive iterati
 
 ![AgentCommander Concept](main_pic.png)
 
-AgentCommander is an advanced, **graph-based workflow execution engine** designed to orchestrate AI Agents for complex, iterative tasks. Built on top of the **Gemini CLI**, it enables Machine Learning engineers to construct highly customizable, infinite-loop workflows.
+**AgentCommander was born from the actual demands of scientific research.**
+
+Refined through rigorous practical application, it is a graph-based workflow engine designed to orchestrate AI Agents for complex, iterative tasks. Built to leverage the diverse ecosystem of **LLM CLIs** (Gemini, Qwen, Claude, etc.), it enables Machine Learning engineers to construct highly customizable, infinite-loop workflows.
 
 ### Key Capabilities
 
