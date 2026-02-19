@@ -252,11 +252,12 @@
               "config": {
                 "file_permission_mode": "forbid",
                 "model": "auto-gemini-3",
+                "no_exec_files": "evaluator.py, strategy.py",
                 "response_output": "hypothesis_output",
                 "session_id_output": "session_v1",
                 "session_mode": "new",
                 "timeout": 600,
-                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nCurrent Working Directory: {current_exp_path}\nVenv: {venv}\nCycle: {cycle}/{n_cycles}\nPrevious Hypothesis: {hypothesis}\nPrevious Experiment Design: {exp_design}\nPrevious Results: {result_analysis}\nImproved from Parent: {is_improved}\nMore experiment record:\n{lessons_text}\n\nHuman Instructions:\nstep1: Analyze the previous research context. Read the strategy code (*.py) code. Make sure you read the important result picture {plot_names}. They are bad windows in @eval_out.txt. Find where the problem is in previous experiment.\nstep2: Output a plan to improve the strategy in string format. explain how it relates to ur analysis. [Important] No edit/run code, just answer."
+                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nCurrent Working Directory: {current_exp_path}\nEval Command: {eval_cmd}\nCycle: {cycle}/{n_cycles}\nPrevious Hypothesis: {hypothesis}\nPrevious Experiment Design: {exp_design}\nPrevious Results: {result_analysis}\nImproved from Parent: {is_improved}\nMore experiment record:\n{lessons_text}\n\nHuman Instructions:\nstep1: Analyze the previous research context. Read the strategy code (*.py) code. Make sure you read the important result picture {plot_names}. They are bad windows in @eval_out.txt. Find where the problem is in previous experiment.\nstep2: Output a plan to improve the strategy in string format. explain how it relates to ur analysis. [Important] No edit/run code, just answer."
               },
               "id": "step1_impl",
               "label": "1.make hypothesis",
@@ -283,7 +284,7 @@
             },
             {
               "config": {
-                "command": "cd {current_exp_path} && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\" > eval_out.txt 2>&1; cat eval_out.txt",
+                "command": "cd {current_exp_path} && {eval_cmd} > eval_out.txt 2>&1; cat eval_out.txt",
                 "output_vars": [
                   "test_output"
                 ],
@@ -367,13 +368,14 @@
               "config": {
                 "file_permission_mode": "whitelist",
                 "model": "gemini-3-flash-preview",
+                "no_exec_files": "evaluator.py, strategy.py",
                 "response_output": "llm_response",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
                 "session_mode": "inherit",
                 "target_files": "strategy.py",
                 "timeout": 600,
-                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nHuman Instructions:\nstep1: Modify strategy code (*.py) to implement ur hypothesis. You are encouraged to add/remove print statements for intermediate variables to clarify the research process. But u should try to reduce the warnning output or repetitive output because they will distract u from important variables.\n\nNote that u not need to run code. I will run export PYTHONPATH=$PYTHONPATH:../../ && {venv} -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\" > eval_out.txt 2>&1; cat eval_out.txt later\n"
+                "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nHuman Instructions:\nstep1: Modify strategy code (*.py) to implement ur hypothesis. You are encouraged to add/remove print statements for intermediate variables to clarify the research process. But u should try to reduce the warnning output or repetitive output because they will distract u from important variables.\n\nNote that u not need to run code. I will run {eval_cmd} > eval_out.txt 2>&1; cat eval_out.txt later\n"
               },
               "id": "n_1766207420852",
               "label": "2. implement",
@@ -426,12 +428,13 @@
               "config": {
                 "file_permission_mode": "whitelist",
                 "model": "gemini-3-flash-preview",
+                "no_exec_files": "evaluator.py, strategy.py",
                 "response_output": "correction_log",
                 "session_id_input": "session_v1",
                 "session_mode": "inherit",
                 "target_files": "strategy.py",
                 "timeout": 600,
-                "user_template": "{DEFAULT_SYS}\n\nThe previous attempt failed to improve the metric.\nCurrent Metric: {current_metric}\nParent Metric: {parent_metric}\nCorrection Trial: {correction_trials}/5\n\nEvaluator Output:\n{test_output}\n\nTask:\nAnalyze the failure and the evaluator output.\nModify 'strategy.py' to fix the issue or try a different approach to improve the metric.\nEnsure the code is valid and runnable."
+                "user_template": "{DEFAULT_SYS}\n\nThe previous attempt failed to improve the metric.\nPicture: {plot_names}\nCurrent Metric: {current_metric}\nParent Metric: {parent_metric}\nCorrection Trial: {correction_trials}/5\n\nEvaluator Output:\n{test_output}\n\nTask:\nAnalyze the failure and the evaluator output.\nModify 'strategy.py' to fix the issue or try a different approach to improve the metric.\nEnsure the code is valid and runnable."
               },
               "flip": true,
               "id": "step5_2_llm_fix",
@@ -459,6 +462,7 @@
               "config": {
                 "file_permission_mode": "forbid",
                 "model": "gemini-3-flash-preview",
+                "no_exec_files": "evaluator.py, strategy.py",
                 "response_output": "experiment_design",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
@@ -478,6 +482,7 @@
               "config": {
                 "file_permission_mode": "forbid",
                 "model": "gemini-3-flash-preview",
+                "no_exec_files": "evaluator.py, strategy.py",
                 "response_output": "result_analysis",
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
@@ -700,6 +705,7 @@
       "config": {
         "file_permission_mode": "forbid",
         "model": "auto-gemini-3",
+        "no_exec_files": "evaluator.py, strategy.py",
         "response_output": "hint_output",
         "session_id_input": "gemini_session_id",
         "session_mode": "inherit",

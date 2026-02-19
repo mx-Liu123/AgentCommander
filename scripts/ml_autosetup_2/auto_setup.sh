@@ -2,57 +2,54 @@
 
 # <GEMINI_UI_CONFIG>
 # {
-#   "name": "[Case: You only have Dataset] ML Auto-Setup",
-#   "description": "[Case: Single Dataset] Full-stack ML experiment setup: Data splitting, Strategy/Metric generation via AI, and initial evaluation.",
+#   "name": "[Case: You have Training Code] ML Auto-Setup",
+#   "description": "Adapt your existing ML training script to the Agent framework. Requires your script to save model weights (e.g. .pt) for independent evaluation.",
 #   "inputs": [
 #     {"id": "TARGET_ROOT_DIR", "label": "Target Root Directory (Where to create project)", "type": "text", "default": ".", "tooltip": "'.' = AgentCommander Root. Use absolute path for others."},
 #     {"id": "PROJECT_NAME", "label": "Project Name (e.g., my_new_experiment)", "type": "text", "default": "my_new_experiment", "tooltip": "Folder name to create"},
 #     {"id": "DATA_DIR", "label": "Data Directory (Absolute path, must contain X.npy and Y.npy)", "type": "text", "default": "~/test_data/", "tooltip": "Absolute path containing X.npy and Y.npy"},
 #     {"id": "VENV_PYTHON", "label": "Python Interpreter Path (For splitting & config)", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python"},
-#     {"id": "EVAL_CMD", "label": "Evaluation Command (Check Python Path! Do not change 'evaluator.py')", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python evaluator.py", "tooltip": "Command to run the evaluator. Ensure the python path is correct."},
+#     {"id": "EVAL_CMD", "label": "Evaluation Command", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python strategy.py && /home/liumx/.conda/envs/agent_commander/bin/python evaluator.py", "tooltip": "Command to run training then evaluation. Sequential execution is required."},
 #     {"id": "LLM_MODEL", "label": "LLM Model (for generation)", "type": "llm_selector", "options": ["__STANDARD_MODELS__"], "default": "auto-gemini-3"},
-#     {"id": "RESERVED_RATIO", "label": "Reserved Data Ratio (0-1) [Hidden test set never seen by the Agent. Prevents strategy-level overfitting from frequent AI adjustments and ensures unbiased final evaluation]", "type": "number", "default": 0.05},
-#     {"id": "LOCK_PARENT", "label": "🔒 Lock Parent Directory (Read-Only during generation)", "type": "radio", "options": ["true", "false"], "default": "false"},
-#     {"id": "TEST_SET_RATIO", "label": "Test Set Ratio (0-1)", "type": "number", "default": 0.2},
-#     {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s) [Per Eval: No new searches start after this, but current trial finishes]", "type": "number", "default": 600},
-#     {"id": "HARD_LIMIT", "label": "Hard Time Limit (s) [Per Eval: Kill immediately if exceeded, mark as Failure]", "type": "number", "default": 900},
-#     {"id": "USER_SEED", "label": "Random Seed (Number or 'random')", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
-#     {"id": "METRIC_TEXT", "label": "Metric Description (Defines calculate_score. System auto-converts to 'Lower is Better' e.g. via negative sign)", "type": "textarea", "default": "MSE", "rows": 2},
-#     {"id": "TASK_BG_TEXT", "label": "Task Background (Optional, e.g. LSTM/CNN for 3D/4D data)", "type": "textarea", "default": "GW PTA wave to phase", "rows": 2},
-#     {"id": "MODEL_HINT_TEXT", "label": "Model/Strategy Hint (Optional)", "type": "textarea", "default": "with cnn+LSTM?", "rows": 2}
-#   ],
-#   "preview_steps": [
-#     "1. Environment Check & Confirmation",
-#     "2. Create Directory Structure",
-#     "3. Data Splitting",
-#     "4. AI Code Generation (Strategy, Metric, Plot). Note: evaluator.py is a fixed template to ensure evaluation correctness.",
-#     "5. Validation & Dry Run",
-#     "6. Update config.json"
-#   ],
-#   "system_intro": [
-#     "DATA REQUIREMENTS:",
-#     "• X.npy: Shape (N, ...). N = samples. Supports arbitrary tensor dimensions (e.g. features, time steps).",
-#     "• Y.npy: Shape (N, ...). Must match N samples in X.",
-#     "",
-#     "SYSTEM ARCHITECTURE:",
-#     "• evaluator.py (JUDGE): Orchestrates parameter search using strategy.py. IMMUTABLE by Agent. Includes built-in anti-cheating checks.",
-#     "• strategy.py (PLAYER): The model/strategy logic. High freedom for Agent to optimize and refactor.",
-#     "• metric.py (RULER): Defines score calculation. Customized by AI during Setup. READ-ONLY during Agent Iteration Loop. Recommendation: Verify its logic before starting the loop.",
-#     "• plot.py (VISUALIZER): Generates visual feedback. Customized by AI during Setup. READ-ONLY during Agent Iteration Loop. Recommendation: Verify the output plot before starting the loop."
-#   ]
+    {"id": "LOCK_PARENT", "label": "🔒 Lock Parent Directory (Read-Only during generation)", "type": "radio", "options": ["true", "false"], "default": "false"},
+    {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s) [Per Eval: No new searches start after this, but current trial finishes]", "type": "number", "default": 600},
+    {"id": "HARD_LIMIT", "label": "Hard Time Limit (s) [Per Eval: Kill immediately if exceeded, mark as Failure]", "type": "number", "default": 900},
+    {"id": "USER_SEED", "label": "Random Seed (Number or 'random')", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
+    {"id": "METRIC_TEXT", "label": "Metric Description (Defines calculate_score. System auto-converts to 'Lower is Better' e.g. via negative sign)", "type": "textarea", "default": "MSE", "rows": 2},
+    {"id": "TASK_BG_TEXT", "label": "Task Background (Optional, e.g. LSTM/CNN for 3D/4D data)", "type": "textarea", "default": "GW PTA wave to phase", "rows": 2},
+    {"id": "MODEL_HINT_TEXT", "label": "Model/Strategy Hint (Optional)", "type": "textarea", "default": "with cnn+LSTM?", "rows": 2}
+  ],
+  "preview_steps": [
+    "1. Environment Check & Confirmation",
+    "2. Create Directory Structure",
+    "3. AI Adaptation (Strategy, Evaluator, Metric, Plot).",
+    "4. Validation (Sequential Train -> Eval)",
+    "5. Update config.json"
+  ],
+  "system_intro": [
+    "PROTOCOL & ARCHITECTURE:",
+    "• experiment_setup.py: IMMUTABLE data protocol. Ensures Strategy and Evaluator use identical splits.",
+    "• strategy.py (PLAYER): Your training code. Must save weights and implement load_trained_model() for Evaluator.",
+    "• evaluator.py (JUDGE): Loads weights from Strategy and runs standardized evaluation. Includes Anti-Cheating check.",
+    "• metric.py & plot.py: Automated score and visualization logic. Read-Only during iteration loop."
+  ]
 # }
 # </GEMINI_UI_CONFIG>
 
 # 1. Locate Source Files (Assumes script is in the same dir as templates)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-SPLIT_SCRIPT="$SCRIPT_DIR/split_data.py"
 EVALUATOR_SCRIPT="$SCRIPT_DIR/evaluator.py"
 STRATEGY_SCRIPT="$SCRIPT_DIR/strategy.py"
 METRIC_SCRIPT="$SCRIPT_DIR/metric.py"
 PLOT_SCRIPT="$SCRIPT_DIR/plot.py"
 
+# Reference Files
+STRATEGY_REF="$SCRIPT_DIR/strategy_ref.py"
+EVALUATOR_REF="$SCRIPT_DIR/evaluator_ref.py"
+EXP_SETUP_SCRIPT="$SCRIPT_DIR/experiment_setup.py"
+
 # Check if source files exist
-for file in "$SPLIT_SCRIPT" "$EVALUATOR_SCRIPT" "$STRATEGY_SCRIPT" "$METRIC_SCRIPT" "$PLOT_SCRIPT"; do
+for file in "$EVALUATOR_SCRIPT" "$STRATEGY_SCRIPT" "$METRIC_SCRIPT" "$PLOT_SCRIPT" "$STRATEGY_REF" "$EVALUATOR_REF" "$EXP_SETUP_SCRIPT"; do
     if [ ! -f "$file" ]; then
         echo "Error: Source file not found: $file"
         exit 1
@@ -194,12 +191,7 @@ fi
 DEFAULT_VENV="/home/$USER/.conda/envs/agent_commander/bin/python"
 get_input "PYTHON_PATH" "Python Interpreter Path" "$DEFAULT_VENV"
 
-DEFAULT_RESERVED=0.05
-get_input "RESERVED_RATIO" "Reserved Data Ratio (0-1)" "$DEFAULT_RESERVED"
-
 echo -e "\n--- Evaluation Config ---"
-DEFAULT_TEST_RATIO=0.2
-get_input "TEST_SET_RATIO" "Internal Test Set Ratio (0-1)" "$DEFAULT_TEST_RATIO"
 
 DEFAULT_SOFT=600
 get_input "SOFT_LIMIT" "Soft Time Limit (seconds)" "$DEFAULT_SOFT"
@@ -244,53 +236,27 @@ fi
 EXP_DIR="$PROJECT_ROOT/Branch_example/exp_example"
 
 mkdir -p "$EXP_DIR/data" # Create data dir placeholder, though we use absolute path
-cp "$SPLIT_SCRIPT" "$PROJECT_ROOT/"
 cp "$EVALUATOR_SCRIPT" "$STRATEGY_SCRIPT" "$METRIC_SCRIPT" "$PLOT_SCRIPT" "$EXP_DIR/"
+# Copy Reference & Setup files
+cp "$STRATEGY_REF" "$EVALUATOR_REF" "$EXP_SETUP_SCRIPT" "$EXP_DIR/"
 
 echo "[Setup] Files copied to $EXP_DIR"
 
 # ==============================================================================
-# 4. Data Preparation
+# 5. Configure Experiment Setup (sed)
 # ==============================================================================
 
-echo -e "\n[Data] Running split_data.py on $DATA_DIR..."
-# We use the system python or custom python to run the split script? Use custom for safety
-"$PYTHON_PATH" "$PROJECT_ROOT/split_data.py" "$DATA_DIR" "$RESERVED_RATIO"
+TARGET_SETUP="$EXP_DIR/experiment_setup.py"
+echo "[Config] Injecting settings into $TARGET_SETUP..."
 
-if [ $? -ne 0 ]; then
-    echo "Error: Data splitting failed."
-    exit 1
-fi
+# 1. Update DATA_PATH
+# We append a slash to ensure it's treated as a directory
+sed -i "s|^DATA_PATH = .*|DATA_PATH = \"$DATA_DIR/\"|" "$TARGET_SETUP"
 
-# ==============================================================================
-# 5. Configure Evaluator (sed)
-# ==============================================================================
+# 2. Update Random Seed
+sed -i "s/^PROTOCOL_SEED = .*/PROTOCOL_SEED = $RANDOM_SEED/" "$TARGET_SETUP"
 
-TARGET_EVAL="$EXP_DIR/evaluator.py"
-echo "[Config] Injecting settings into $TARGET_EVAL..."
-
-# 1. Update DATA_DIR (Using | as delimiter to handle paths)
-sed -i "s|^DATA_DIR = .*|DATA_DIR = \"$DATA_DIR\"|" "$TARGET_EVAL"
-
-# 2. Update TEST_SIZE
-sed -i "s/^TEST_SIZE = .*/TEST_SIZE = $TEST_SET_RATIO/" "$TARGET_EVAL"
-
-# 3. Update Time Limits
-sed -i "s/soft_limit_seconds = .*/soft_limit_seconds = $SOFT_LIMIT/" "$TARGET_EVAL"
-sed -i "s/hard_limit_seconds = .*/hard_limit_seconds = $HARD_LIMIT/" "$TARGET_EVAL"
-
-# 4. Update Random Seed
-sed -i "s/^RANDOM_SEED = .*/RANDOM_SEED = $RANDOM_SEED/" "$TARGET_EVAL"
-
-# --- Baseline Integrity Check ---
-if command -v md5sum &> /dev/null; then
-    EVAL_HASH_START=$(md5sum "$TARGET_EVAL" | awk '{print $1}')
-else
-    # Fallback for systems without md5sum
-    EVAL_HASH_START="unknown"
-fi
-
-echo "Evaluator Hash (Baseline): $EVAL_HASH_START"
+echo "Experiment Setup configured."
 
 # ==============================================================================
 # 6. AI Generation Loop
@@ -311,23 +277,11 @@ while true; do
     # Restrict execution of key files during generation
     NO_EXEC_FLAG="--no-exec evaluator.py,strategy.py"
 
-    # --- Reset Evaluator (Ensure pristine state before AI gen) ---
-    # Copy fresh template
-    cp "$EVALUATOR_SCRIPT" "$EXP_DIR/"
-    TARGET_EVAL="$EXP_DIR/evaluator.py"
+    # --- Reset to Reference Templates ---
+    # We use the _ref files as the baseline for AI modification
+    cp "$STRATEGY_REF" "$EXP_DIR/strategy.py"
+    cp "$EVALUATOR_REF" "$EXP_DIR/evaluator.py"
     
-    # Re-apply configurations
-    sed -i "s|^DATA_DIR = .*|DATA_DIR = \"$DATA_DIR\"|" "$TARGET_EVAL"
-    sed -i "s/^TEST_SIZE = .*/TEST_SIZE = $TEST_SET_RATIO/" "$TARGET_EVAL"
-    sed -i "s/soft_limit_seconds = .*/soft_limit_seconds = $SOFT_LIMIT/" "$TARGET_EVAL"
-    sed -i "s/hard_limit_seconds = .*/hard_limit_seconds = $HARD_LIMIT/" "$TARGET_EVAL"
-    sed -i "s/^RANDOM_SEED = .*/RANDOM_SEED = $RANDOM_SEED/" "$TARGET_EVAL"
-    
-    # Update Hash Baseline
-    if command -v md5sum &> /dev/null; then
-        EVAL_HASH_START=$(md5sum "$TARGET_EVAL" | awk '{print $1}')
-    fi
-
     # --- Step 5: Strategy Generation ---
     echo "[LLM] Generating Strategy (Attempt $((RETRY_COUNT+1)))..."
     
@@ -337,12 +291,17 @@ while true; do
     if [ $RETRY_COUNT -gt 0 ]; then
         RESUME_FLAG="--resume"
         if [ -n "$LAST_ERROR_LOG" ]; then
-            EXTRA_INSTRUCTION="PREVIOUS ATTEMPT FAILED. Here is the error log from the previous run:\n----------------\n$LAST_ERROR_LOG\n----------------\n\nPLEASE FIX THE CODE BASED ON THIS ERROR. Ensure you output the COMPLETE corrected file content."
+            EXTRA_INSTRUCTION="PREVIOUS ATTEMPT FAILED. Error Log:\n$LAST_ERROR_LOG\n\nFix the code based on this error."
         fi
     fi
 
-    PROMPT_STRATEGY="We are creating a working directory for an Agent. $EXP_DIR/evaluator.py is the judge, and $EXP_DIR/strategy.py is the contestant. Analyze the structure of both. Task Background: $TASK_BG_TEXT. Do NOT modify evaluator.py. Model Hints: $MODEL_HINT_TEXT. **IMPORTANT: Completely ignore the original logic of strategy.py and refactor it entirely based on the task background.** Now modify the model at $EXP_DIR/strategy.py. Ensure you keep: def get_search_configs():, class Strategy: def __init__(self, params=None):, def fit(self, X, y):, def predict(self, X):. \
-IMPORTANT: Do NOT try to run the code yourself. The system will run it for you after you finish editing. \
+    PROMPT_STRATEGY="Target: $EXP_DIR/strategy.py. Task Background: $TASK_BG_TEXT. Model Hints: $MODEL_HINT_TEXT. \
+GOAL: Adapt this user-provided script to our Agent Framework with MINIMAL changes. \
+REQUIREMENTS: \
+1. DATA: Replace original data loading with 'from experiment_setup import load_and_split_data'. \
+2. INTERFACE: Implement 'def load_trained_model(path, device):' (See strategy_ref.py). This MUST return a loaded model instance for evaluation. \
+3. EXECUTION: Ensure 'if __name__ == \"__main__\":' runs training and saves the model to 'best_fast.pt'. \
+4. IMPORTANT: Do NOT try to run the code yourself. The system will run it for you after you finish editing. \
 $EXTRA_INSTRUCTION"
     
     printf "%b" "$PROMPT_STRATEGY" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
@@ -354,14 +313,34 @@ $EXTRA_INSTRUCTION"
         $NO_EXEC_FLAG \
         $RESUME_FLAG
 
+    # --- Step 5.5: Evaluator Adaptation ---
+    echo "[LLM] Adapting Evaluator..."
+    PROMPT_EVAL="Target: $EXP_DIR/evaluator.py. Reference: $EXP_DIR/evaluator_ref.py. \
+GOAL: Adapt the evaluator to test the model trained by strategy.py. \
+REQUIREMENTS: \
+1. Use 'from strategy import load_trained_model'. \
+2. Use 'from experiment_setup import load_and_split_data, get_validation_noise_generator'. \
+3. Load 'best_fast.pt' using the factory function. \
+4. Perform inference and print 'Best metric: X.XXXX'. \
+5. Do NOT try to run the code yourself."
+
+    printf "%b" "$PROMPT_EVAL" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
+        --model "$LLM_MODEL" \
+        --cwd "$EXP_DIR" \
+        --whitelist "evaluator.py,metric.py,plot.py" \
+        --timeout 300 \
+        $LOCK_FLAG \
+        $NO_EXEC_FLAG \
+        --resume
+
     # --- Step 6: Metric Generation ---
     echo "[LLM] Generating Metric..."
-    PROMPT_METRIC="Hint: $METRIC_TEXT. Now modify $EXP_DIR/metric.py."
+    PROMPT_METRIC="Hint: $METRIC_TEXT. Now modify $EXP_DIR/metric.py. Ensure calculate_score(y_true, y_pred) handles the shapes produced by strategy.py."
     
     printf "%b" "$PROMPT_METRIC" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
-        --whitelist "strategy.py,metric.py,plot.py" \
+        --whitelist "metric.py,plot.py" \
         --timeout 300 \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
@@ -369,12 +348,12 @@ $EXTRA_INSTRUCTION"
     
     # --- Step 7: Plot Generation (New) ---
     echo "[LLM] Generating Plot Visualization..."
-    PROMPT_PLOT="We added a visualization plugin at $EXP_DIR/plot.py. Based on Task Background '$TASK_BG_TEXT' and Metric '$METRIC_TEXT', modify this file. Requirements: 1. Draw only ONE plot that best represents model performance (e.g., Pred vs True, or Confusion Matrix). 2. Plot must be clear and professional. 3. Save as 'best_result.png'. 4. Do NOT call plt.show(), only save. 5. Function signature MUST be 'draw_plots(X_test, y_test, y_pred, output_dir, params)' and return a list of filenames."
+    PROMPT_PLOT="Modify $EXP_DIR/plot.py. Task: $TASK_BG_TEXT. Metric: $METRIC_TEXT. Requirements: 1. Draw ONE plot (e.g. Pred vs True). 2. Save as 'best_result.png'. 3. Function signature: 'draw_plots(X_test, y_test, y_pred, output_dir, params)'."
     
     printf "%b" "$PROMPT_PLOT" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
-        --whitelist "strategy.py,metric.py,plot.py" \
+        --whitelist "plot.py" \
         --timeout 300 \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
@@ -387,97 +366,84 @@ $EXTRA_INSTRUCTION"
     echo -e "\n[Validation] Checking integrity and functionality..."
     HAS_ERROR=0
 
-    # 7. Check Strategy Structure
-    REQUIRED_STRINGS=("class Strategy" "def get_search_configs" "def __init__" "def fit" "def predict")
-    for req in "${REQUIRED_STRINGS[@]}"; do
-        if ! grep -q "$req" "$EXP_DIR/strategy.py"; then
-            echo "❌ ERROR: strategy.py is missing '$req'"
-            HAS_ERROR=1
-        fi
-    done
-
-    # 8. Check Evaluator Integrity
-    if [ "$EVAL_HASH_START" != "unknown" ]; then
-        EVAL_HASH_NOW=$(md5sum "$TARGET_EVAL" | awk '{print $1}')
-        if [ "$EVAL_HASH_START" != "$EVAL_HASH_NOW" ]; then
-            echo "❌ CRITICAL: evaluator.py has been modified by AI!"
-            echo "Expected: $EVAL_HASH_START"
-            echo "Actual:   $EVAL_HASH_NOW"
-            HAS_ERROR=1
-        else
-             echo "✅ Evaluator integrity verified."
-        fi
+    # 7. Check Strategy Interface
+    if ! grep -q "def load_trained_model" "$EXP_DIR/strategy.py"; then
+        echo "❌ ERROR: strategy.py is missing 'def load_trained_model'"
+        HAS_ERROR=1
     fi
 
-    # 9. Dry Run
-    echo "[Validation] performing dry run..."
+    # 8. Check Evaluator Anti-Cheating Protection
+    if ! grep -q "def check_data_leakage" "$EXP_DIR/evaluator.py"; then
+        echo "❌ ERROR: evaluator.py is missing 'def check_data_leakage'! Security protection was removed by AI."
+        HAS_ERROR=1
+    fi
+    if ! grep -q "check_data_leakage(" "$EXP_DIR/evaluator.py"; then
+        echo "❌ ERROR: evaluator.py defines but NEVER CALLS 'check_data_leakage'! Anti-cheating is inactive."
+        HAS_ERROR=1
+    fi
+
+    # 9. Dry Run (Sequential)
+    echo "[Validation] performing dry run (Train -> Eval)..."
     
-    # Use subshell to isolate directory change
+    # Use subshell to isolate directory change and prevent path corruption
     (
         cd "$EXP_DIR" || exit 1
         
-        # Create temp file for capturing output while streaming
-        DRY_RUN_LOG=$(mktemp)
-
-        # Run a quick check using python -c. We assume evaluate returns a float (score) or raises error.
-        # We use tee to show output in real-time while capturing it.
-        "$PYTHON_PATH" -u -c "
-import sys
-try:
-    from evaluator import evaluate
-    print('Starting Dry Run...')
-    # We pass the strategy filename
-    score = evaluate('strategy.py')
-    print(f'Dry Run Success. Best metric: {score}')
-    # Check if plot was generated (evaluator usually prints something or we check file)
-    import os
-    if os.path.exists('best_result.png'):
-        print('PLOT_GENERATED: best_result.png found.')
-except Exception as e:
-    print(f'Dry Run Failed: {e}')
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-" 2>&1 | tee "$DRY_RUN_LOG"
+        # 1. Run Training
+        echo "Running Strategy (Training)..."
+        if ! "$PYTHON_PATH" strategy.py > train_log.txt 2>&1; then
+            echo "❌ Training Failed."
+            cat train_log.txt | tail -n 20
+            exit 101
+        else
+            echo "✅ Training Complete."
+        fi
         
-        # Capture exit code of the first command in pipe (python)
-        DRY_RUN_EXIT_CODE=${PIPESTATUS[0]}
-        
-        # Move log content to parent-accessible file or just echo it
-        cat "$DRY_RUN_LOG" > ../../../dry_run_out.tmp
-        echo "$DRY_RUN_EXIT_CODE" > ../../../dry_run_code.tmp
-        
-        rm "$DRY_RUN_LOG"
+        # 2. Run Evaluation
+        echo "Running Evaluator..."
+        if ! "$PYTHON_PATH" evaluator.py > eval_out.txt 2>&1; then
+            echo "❌ Evaluation Failed."
+            cat eval_out.txt
+            exit 102
+        else
+            echo "✅ Evaluation Complete."
+            OUT=$(cat eval_out.txt)
+            echo "$OUT"
+            
+            # Check for metric output
+            if ! echo "$OUT" | grep -q "Best metric:"; then
+                 echo "❌ Critical: Evaluator did not print 'Best metric: X.XXX'"
+                 exit 103
+            fi
+            
+            if echo "$OUT" | grep -q "Best metric: inf"; then
+                 echo "❌ Critical: Metric is INF."
+                 exit 104
+            fi
+        fi
     )
     
-    # Read back results
-    if [ -f "dry_run_out.tmp" ]; then
-        DRY_RUN_OUT=$(cat dry_run_out.tmp)
-        DRY_RUN_EXIT_CODE=$(cat dry_run_code.tmp)
-        rm dry_run_out.tmp dry_run_code.tmp
-    else
-        DRY_RUN_EXIT_CODE=1
-        DRY_RUN_OUT="Fatal Error: Dry run output lost."
+    # Capture subshell exit code
+    DRY_RUN_EXIT_CODE=$?
+    
+    # Debug info
+    if [ $DRY_RUN_EXIT_CODE -ne 0 ]; then
+        echo "DEBUG: Subshell exited with code $DRY_RUN_EXIT_CODE."
+        if [ $DRY_RUN_EXIT_CODE -eq 101 ]; then echo "DEBUG: Failure Point -> Strategy Training"; fi
+        if [ $DRY_RUN_EXIT_CODE -eq 102 ]; then echo "DEBUG: Failure Point -> Evaluator Execution"; fi
+        if [ $DRY_RUN_EXIT_CODE -eq 103 ]; then echo "DEBUG: Failure Point -> Missing 'Best metric' output"; fi
+        if [ $DRY_RUN_EXIT_CODE -eq 104 ]; then echo "DEBUG: Failure Point -> Metric is INF"; fi
     fi
-
-    if [ "${DRY_RUN_EXIT_CODE:-1}" -eq 0 ]; then
-        echo "✅ Dry Run Successful (Exit Code 0)."
-        echo "$DRY_RUN_OUT" | grep "Best metric"
-        
-        # Check for inf score
-        if echo "$DRY_RUN_OUT" | grep -q "Best metric: inf"; then
-             echo "❌ Critical: Metric is INF (Infinite). Marking as failure."
-             HAS_ERROR=1
-        fi
-
-        # Check for plot output
-        echo "$DRY_RUN_OUT" | grep "PLOT_GENERATED"
+    
+    if [ $DRY_RUN_EXIT_CODE -eq 0 ]; then
+        echo "✅ Dry Run Successful."
     else
-        echo "❌ Dry Run Failed."
-        echo "--- Output ---"
-        echo "$DRY_RUN_OUT"
-        echo "--------------"
+        echo "❌ Dry Run Failed (Code $DRY_RUN_EXIT_CODE)."
         HAS_ERROR=1
+        # Capture errors for next attempt feedback
+        if [ -f "$EXP_DIR/train_log.txt" ]; then
+            LAST_ERROR_LOG=$(tail -n 50 "$EXP_DIR/train_log.txt" "$EXP_DIR/eval_out.txt" 2>/dev/null)
+        fi
     fi
 
     # ==============================================================================
@@ -560,8 +526,10 @@ try:
     # Using os.environ to get exported bash variables
     data['root_dir'] = f"./{os.environ['PROJECT_NAME']}"
     data['global_vars']['venv'] = os.environ['VENV_PYTHON']
-    # Construct eval_cmd for Agent usage
-    data['global_vars']['eval_cmd'] = f"{os.environ['VENV_PYTHON']} evaluator.py"
+    
+    # Construct sequential eval_cmd for Agent usage (Train then Eval)
+    py = os.environ['VENV_PYTHON']
+    data['global_vars']['eval_cmd'] = f"{py} strategy.py && {py} evaluator.py"
     
     # Plot names with fallback
     plot_out = os.environ.get('PLOT_OUTPUT', '')

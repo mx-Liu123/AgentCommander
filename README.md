@@ -130,7 +130,7 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
 
 4.  **Run an Example Task:**
     *   Ensure the `Root Dir` in the Control Panel points to `example/diabetes_sklearn` (relative path).
-    *   **Configure `venv`**: In the "Global Variables" section, ensure the `venv` variable points to your python executable (e.g., `python` or `/path/to/your/conda/env/bin/python`). This is used by the workflow to run evaluation scripts.
+    *   **Configure `eval_cmd`**: In the "Global Variables" section, ensure the `eval_cmd` variable contains the command to run your evaluation script (e.g., `/path/to/python -c "from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))"`). This is used by the workflow to run evaluation scripts.
     *   Click "Start Agent" to begin the automated experiment loop.
     *   Monitor progress in the "Console" and "Explorer" tabs.
 
@@ -144,7 +144,7 @@ For new projects, AgentCommander provides an **Auto-Setup Wizard** (`scripts/ml_
     *   Split your data into development and reserved sets.
     *   Generate a **strict "Judge" (`evaluator.py`)**: This script acts as an immutable referee, ensuring execution integrity and error handling while outsourcing all creative degrees of freedom to `strategy.py`.
     *   Configure **Plugins**: Generates initial `metric.py` and `plot.py` which serve as non-modifiable plugins for the evaluator during the standard training flow.
-    *   **Auto-configure `config.json`**: Automatically sets the `root_dir`, `venv`, and visual configurations.
+    *   **Auto-configure `config.json`**: Automatically sets the `root_dir`, `eval_cmd`, and visual configurations.
 4.  **One-Click Start**: Once the script finishes, simply launch the UI (`bash run_ui.sh`) and click **"Start Agent"**. Your workspace is already fully configured and ready to evolve.
 
 ## Reference Experiment Structure
@@ -164,7 +164,7 @@ In the default workflow, the agent evaluates a strategy by running a shell comma
 
 ```bash
 cd {current_exp_path} && \
-{venv} -c "from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))" > eval_out.txt 2>&1; \
+{eval_cmd} > eval_out.txt 2>&1; \
 cat eval_out.txt
 ```
 
@@ -194,7 +194,7 @@ The `config.json` file controls the core behavior of the agent system. You can m
 
 *   **root_dir**: The working directory where experiments and data are stored.
 *   **n_cycles**: The number of experiment iterations to run.
-*   **global_vars**: These are hardcoded environment variables (e.g., `venv` for the python path, system paths) accessible throughout the workflow.
+*   **global_vars**: These are hardcoded environment variables (e.g., `eval_cmd` for the evaluation command, system paths) accessible throughout the workflow.
 *   **workflow**: The workflow definition graph. Can be a full JSON object or a string path to a separate JSON file (e.g., `"my_workflows/workflow_v1.json"`).
 *   **Shared Context**: All nodes in the workflow exchange data through a shared variable pool, known as the `context`. This allows for flexible data flow between different modules without strict parameter passing.
 

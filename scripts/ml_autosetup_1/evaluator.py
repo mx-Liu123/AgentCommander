@@ -178,7 +178,7 @@ def run_parameter_search(strategy_module):
             traceback.print_exc()
             continue
              
-    print(f"\nSearch Complete. Best Score: {best_score}")
+    print(f"\nSearch Complete. Best metric: {best_score}")
     
     # --- Final Data Leakage Check ---
     if best_params is not None:

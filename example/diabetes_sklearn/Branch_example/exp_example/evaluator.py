@@ -109,7 +109,7 @@ def run_parameter_search(strategy_module):
              
     total_time = time.time() - start_time
     print(f"\nSearch Complete in {total_time:.2f}s")
-    print(f"Best MSE Score: {best_score}")
+    print(f"Best metric: {best_score}")
     print(f"Best Params: {best_params}")
     
     return best_score
@@ -143,5 +143,8 @@ def evaluate(strategy_path):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         print(evaluate(sys.argv[1]))
+    elif os.path.exists("strategy.py"):
+        print(f"No argument provided. Defaulting to 'strategy.py'...")
+        print(evaluate("strategy.py"))
     else:
         print("Usage: python evaluator.py <path_to_strategy.py>")

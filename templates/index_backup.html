@@ -333,7 +333,7 @@
                                     <div class="mb-2">
                                         <label>Command</label>
                                         <input type="text" class="form-control bg-dark text-light font-monospace" v-model="selectedStep.config.command">
-                                        <small class="text-muted">Supports {venv} placeholder</small>
+                                        <small class="text-muted">Supports {eval_cmd} placeholder</small>
                                     </div>
                                     <div class="mb-2">
                                         <label>Timeout (s)</label>
@@ -455,7 +455,7 @@
                                                     { 
                                                         type: 'run_shell', label: 'Run Evaluator (Preset)', name: 'Run Evaluator',
                                                         config: { 
-                                                            command: "export PYTHONPATH=$PYTHONPATH:../../ && {venv} -c \"import os; [os.environ.update({line.split('=', 1)[0].strip(): line.split('=', 1)[1].strip()}) for line in open('best_param.env') if '=' in line and not line.strip().startswith('#')]; from evaluator import evaluate; print(evaluate('strategy.py'))\"", 
+                                                            command: "{eval_cmd}", 
                                                             timeout: 120,
                                                             input_vars: ['best_param.env', 'strategy.py'], output_vars: ['current_metric']
                                                         } 
@@ -512,7 +512,7 @@
                     workflow: [],
                     llm_changeable_vars: ['hypothesis', 'exp_design', 'result_analysis'],
                     global_vars: {
-                                                    "venv": "python",
+                                                    "eval_cmd": "python -c \"from evaluator import evaluate; print('Best metric:', evaluate('strategy.py'))\"",
                         "DEFAULT_SYS": "[SYSTEM: You are an autonomous AI agent.] Strictly maintain history.json schema: gemini_session_id, claude_session_id, hypothesis, parent_exp, exp_design, if_improved, metrics, result_analysis. NOTE: ../../evaluator.py is IMMUTABLE. You must use it as is to ensure fair comparison. Do not modify it."
                     }
                 });
@@ -702,7 +702,7 @@
                         B: '1', L: '1', S: '1',
                         condition: 'new_branch',
                         current_exp_folder: '/home/user/workspace/exp1.1.1',
-                        venv: '/path/to/venv/bin/python',
+                        eval_cmd: '/path/to/venv/bin/python -c "..."',
                         ...config.value.global_vars // Inject User Custom Vars
                     };
                     

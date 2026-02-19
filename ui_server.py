@@ -91,6 +91,11 @@ def script_runner_thread(cmd, env_vars, cwd):
     full_env["NON_INTERACTIVE"] = "1"
     full_env["AGENT_APP_ROOT"] = os.getcwd() # Inject App Root for scripts to reference
     
+    # Validation: Ensure cwd exists
+    if not os.path.exists(cwd):
+        socketio.emit('script_log', {'data': f'⚠️ Working directory {cwd} does not exist. Falling back to App Root: {os.getcwd()}\n'})
+        cwd = os.getcwd()
+
     try:
         # Use Popen to capture output in real-time
         # Use pty to force line buffering (optional, but subprocess usually buffers)
@@ -171,6 +176,10 @@ def stop_script_api():
         return jsonify({"status": "terminated"})
     return jsonify({"status": "no_process"})
 
+@app.route('/api/models', methods=['GET'])
+def get_models_api():
+    return jsonify(llm_models.MODEL_PRESETS)
+
 # Default root dir
 CURRENT_ROOT_DIR = os.path.join(os.getcwd(), 'Find_Transform')
 if not os.path.exists(CURRENT_ROOT_DIR):
@@ -186,9 +195,13 @@ def get_branches(root_dir):
 
 def background_log_emitter():
     global recent_logs
+    print("DEBUG: background_log_emitter STARTED", flush=True) # Confirm start
     while True:
         try:
             msg = log_queue.get(timeout=0.1)
+            
+            # DEBUG PRINT
+            print(f"DEBUG: Emitter got msg: {str(msg)[:50]}...", flush=True)
             
             # Add timestamp
             if 'time' not in msg:
@@ -210,7 +223,7 @@ def background_log_emitter():
             socketio.sleep(1)
 
 import shutil
-from pylib import llm_client
+from pylib import llm_client, llm_models
 
 # Constants
 APP_ROOT = Path(os.getcwd()).resolve()
@@ -860,10 +873,9 @@ def start_agent():
     except Exception as e:
         return jsonify({"error": f"Failed to load workflow file: {e}"}), 400
 
-    # Inject environment python path if not set by user
-    if 'venv' not in config.get('global_vars', {}):
-        if 'global_vars' not in config: config['global_vars'] = {}
-        config['global_vars']['venv'] = sys.executable 
+    # Ensure eval_cmd is present for the workflow
+    if 'eval_cmd' not in config.get('global_vars', {}):
+        return jsonify({"error": "Missing 'eval_cmd' in Global Variables. Please configure it to run evaluation scripts."}), 400
     
     stop_event.clear()
     

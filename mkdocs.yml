@@ -1,0 +1,59 @@
+site_name: AgentCommander
+site_description: Automating the loop of scientific discovery with AI Agents.
+site_author: AgentCommander Team
+repo_url: https://github.com/yourusername/AgentCommander
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Human Supervision:
+    - Workflow Design: human-supervision/workflow-design.md
+    - White-box Debugging: human-supervision/white-box-debugging.md
+    - Visual Feedback: human-supervision/visual-feedback.md
+  - Automated Engine:
+    - Inner Loop Logic: automated-engine/inner-loop.md
+    - Safety & Sandbox: automated-engine/safety-sandbox.md
+    - Evolutionary Strategy: automated-engine/evolution-strategy.md
+  - Protocols & Setup:
+    - Auto-Setup Wizard: protocols/auto-setup.md
+    - BYOC Protocol: protocols/byoc-protocol.md
+  - Reference & Tips:
+    - CLI Guide (Gemini/Qwen): reference/cli-guide.md
+    - Configuration: reference/configuration.md
+    - Troubleshooting: reference/troubleshooting.md
+  - Guides:
+    - Diabetes Example: guides/diabetes-example.md
+    - HPC/PBS Cluster: guides/hpc-cluster.md
+  - Security: security.md

@@ -40,3 +40,5 @@ run_all_merged*
 !main_pic.png
 !progress_tree.png
 !workflow_editor.png
+my_new_experiment_sc2/
+test_leak.txt

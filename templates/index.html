@@ -244,6 +244,20 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Console Output -->
+                        <div class="card bg-dark border-secondary flex-grow-1 d-flex flex-column" style="min-height: 400px;">
+                            <div class="card-header border-secondary d-flex justify-content-between align-items-center py-2">
+                                <span class="text-muted small uppercase fw-bold">Console Output</span>
+                                <button class="btn btn-sm btn-outline-secondary py-0" @click="logs=[]">Clear</button>
+                            </div>
+                            <div class="card-body p-0 bg-black flex-grow-1" style="overflow-y: auto; font-family: 'Consolas', monospace;" id="console">
+                                <div v-for="(log, i) in logs" :key="i" class="log-entry px-2 py-0 small text-light" :class="{'text-danger': log.type === 'error', 'text-warning': log.type === 'warning'}">
+                                    <span class="text-muted me-2">[{{ log.time }}]</span>
+                                    <span style="white-space: pre-wrap;">{{ log.data }}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div v-if="currentTab === 'setup'">
@@ -288,6 +302,28 @@
                                                     <textarea v-if="field.type === 'textarea'" 
                                                               class="form-control form-control-sm bg-dark text-light border-secondary"
                                                               v-model="scriptForm[field.id]" rows="3" :placeholder="field.default"></textarea>
+                                                              
+                                                    <!-- Select Input -->
+                                                    <select v-if="field.type === 'select'" 
+                                                            class="form-select form-select-sm bg-dark text-light border-secondary" 
+                                                            v-model="scriptForm[field.id]">
+                                                        <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+                                                    </select>
+
+                                                    <!-- Radio Input -->
+                                                    <div v-if="field.type === 'radio'" class="ms-1">
+                                                        <div v-for="opt in field.options" :key="opt" class="form-check">
+                                                            <input class="form-check-input" type="radio" :name="field.id" :id="field.id + '_' + opt" :value="opt" v-model="scriptForm[field.id]">
+                                                            <label class="form-check-label small text-light" :for="field.id + '_' + opt" style="font-family: monospace;">
+                                                                {{ opt }}
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- LLM Selector (Component) -->
+                                                    <llm-selector v-if="field.type === 'llm_selector'" 
+                                                                  v-model="scriptForm[field.id]">
+                                                    </llm-selector>
                                                 </div>
                                             </div>
                                         </div>
@@ -483,37 +519,14 @@
                 </div>
                 
                 <div class="p-3 border-top border-secondary bg-dark">
-                    <div class="input-group input-group-sm mb-2">
-                        <select class="form-select bg-dark text-light border-secondary" 
-                                :value="standardModels.includes(chatModel) ? chatModel : 'custom'"
-                                @change="e => { if(e.target.value !== 'custom') chatModel = e.target.value; else chatModel = ''; }">
-                            <option value="qwen">Qwen (CLI) (BETA)</option>
-                            <option value="auto-gemini-3">Auto (Gemini 3)</option>
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-                            <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
-                            <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-                            <option value="auto-gemini-2.5">Auto (Gemini 2.5)</option>
-                            <option value="custom">Custom...</option>
-                        </select>
-                        <button class="btn btn-outline-danger" @click="resetChatSession" title="New Session">🗑️ Reset</button>
+                    <!-- LLM Selector for Chat -->
+                    <div class="mb-2">
+                        <llm-selector v-model="chatModel"></llm-selector>
                     </div>
-                    <!-- Custom Chat Model Input -->
-                    <div v-if="!standardModels.includes(chatModel)" class="mb-2 card card-body bg-dark border-secondary p-2">
-                        <label class="small text-muted mb-1">Base CLI</label>
-                        <select class="form-select form-select-sm mb-2 bg-dark text-light border-secondary"
-                                :value="parseCustomModel(chatModel).cli"
-                                @change="e => { const curr = parseCustomModel(chatModel); chatModel = `custom:${e.target.value}:${curr.name}`; }">
-                             <option v-for="cli in customBaseCLIs" :value="cli">{{ cli.toUpperCase() }} CLI</option>
-                        </select>
-                        
-                        <label class="small text-muted mb-1">Model Name</label>
-                        <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
-                               :value="parseCustomModel(chatModel).name"
-                               @input="e => { const curr = parseCustomModel(chatModel); chatModel = `custom:${curr.cli}:${e.target.value}`; }"
-                               placeholder="e.g. gpt-4o-qwen">
+                    <div class="d-flex justify-content-end mb-2">
+                        <button class="btn btn-sm btn-outline-danger" @click="resetChatSession" title="New Session">🗑️ Reset Session</button>
                     </div>
+
                     <textarea class="form-control bg-dark text-light border-secondary mb-2" rows="3" v-model="chatInput" @keyup.enter.ctrl="sendChatMessage" placeholder="Describe changes (Ctrl+Enter to send)..."></textarea>
                     <button class="btn btn-sm btn-success w-100" @click="sendChatMessage" :disabled="isChatting || !chatInput.trim()">Send Request</button>
                 </div>
@@ -649,35 +662,7 @@
 
                 <div v-if="selectedNode.type === 'llm_generate'">
                     <label>Model</label>
-                    <select class="form-select mb-2" 
-                            :value="standardModels.includes(selectedNode.config.model) ? selectedNode.config.model : 'custom'"
-                            @change="e => { if(e.target.value !== 'custom') selectedNode.config.model = e.target.value; else selectedNode.config.model = ''; }">
-                        <option value="qwen">Qwen (CLI) (BETA)</option>
-                        <option value="auto-gemini-3">Auto (Gemini 3)</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-                        <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
-                        <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-                        <option value="auto-gemini-2.5">Auto (Gemini 2.5)</option>
-                        <option value="claude-cli">Claude CLI (BETA not recommended)</option>
-                        <option value="custom">Custom...</option>
-                    </select>
-                    <!-- Custom Model Input -->
-                    <div v-if="!standardModels.includes(selectedNode.config.model)" class="mb-2 card card-body bg-dark border-secondary p-2">
-                        <label class="small text-muted mb-1">Base CLI</label>
-                        <select class="form-select form-select-sm mb-2 bg-dark text-light border-secondary"
-                                :value="parseCustomModel(selectedNode.config.model).cli"
-                                @change="e => updateCustomModel(selectedNode.config, 'model', e.target.value, parseCustomModel(selectedNode.config.model).name)">
-                             <option v-for="cli in customBaseCLIs" :value="cli">{{ cli.toUpperCase() }} CLI</option>
-                        </select>
-                        
-                        <label class="small text-muted mb-1">Model Name</label>
-                        <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
-                               :value="parseCustomModel(selectedNode.config.model).name"
-                               @input="e => updateCustomModel(selectedNode.config, 'model', parseCustomModel(selectedNode.config.model).cli, e.target.value)"
-                               placeholder="e.g. gemini-2.0-flash-exp">
-                    </div>
+                    <llm-selector v-model="selectedNode.config.model"></llm-selector>
 
                     <label>Timeout</label>
                     <input type="number" class="form-control mb-2" v-model.number="selectedNode.config.timeout">
@@ -702,12 +687,26 @@
                                                                                                                             <input type="text" class="form-control mb-2" v-model="selectedNode.config.target_files" placeholder="e.g. strategy.py, config.json">
                                                                                                                         </div>
                                                                             
-                                                                                                                        <div v-if="selectedNode.config.file_permission_mode !== 'open'" class="form-check mb-3">
+                                                                                                                        <div v-if="selectedNode.config.file_permission_mode !== 'open'" class="form-check mb-2">
                                                                                                                             <input class="form-check-input" type="checkbox" v-model="selectedNode.config.allow_new_files" id="chk-allow-new">
                                                                                                                             <label class="form-check-label small text-light" for="chk-allow-new">
                                                                                                                                 Allow Creating NEW Files?
                                                                                                                             </label>
-                                                                                                                        </div>                                                <label class="form-label mt-2">Session Mode</label>
+                                                                                                                        </div>
+
+                                                                                                                        <div class="form-check mb-3">
+                                                                                                                            <input class="form-check-input" type="checkbox" v-model="selectedNode.config.lock_parent" id="chk-lock-parent">
+                                                                                                                            <label class="form-check-label small text-warning" for="chk-lock-parent">
+                                                                                                                                🔒 Lock Parent Dir (Read-Only during execution)?
+                                                                                                                            </label>
+                                                                                                                        </div>
+
+                                                                                                                        <div class="mb-3">
+                                                                                                                            <label class="form-label small text-danger">🚫 No-Exec Files (comma separated)</label>
+                                                                                                                            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" v-model="selectedNode.config.no_exec_files" placeholder="e.g. evaluator.py, strategy.py">
+                                                                                                                        </div>
+
+                                                                                                                        <label class="form-label mt-2">Session Mode</label>
                                                 <select class="form-select mb-3" v-model="selectedNode.config.session_mode">                        <option value="new">Start New Session</option>
                         <option value="inherit">Inherit Session</option>
                     </select>
@@ -825,10 +824,85 @@
     {% endraw %}
 
     <script>
-        const { createApp, ref, onMounted, reactive, nextTick, computed } = Vue;
+        const { createApp, ref, onMounted, reactive, nextTick, computed, watch } = Vue;
         const socket = io();
 
-        createApp({
+        // Shared Model Presets (Loaded from Backend)
+        const sharedModels = ref({
+            'gemini': ['auto-gemini-3'], // Fallback
+            'qwen': ['qwen:qwen-turbo'],
+            'claude': ['claude-cli'],
+            'opencode': ['opencode/big-pickle']
+        });
+
+        // --- CENTRALIZED LLM SELECTOR COMPONENT ---
+        const LlmSelector = {
+            props: ['modelValue'],
+            emits: ['update:modelValue'],
+            setup(props, { emit }) {
+                const presets = sharedModels;
+                const availableClis = computed(() => Object.keys(presets.value));
+                
+                const cli = ref('gemini');
+                
+                // Reverse Sync: Detect CLI from current value using available categories
+                watch(() => props.modelValue, (val) => {
+                    if (!val) return;
+                    
+                    // Try to find matching CLI category
+                    for (const c of availableClis.value) {
+                        if (val.startsWith(c) || val.includes(c)) {
+                            cli.value = c;
+                            return;
+                        }
+                    }
+                    // Fallback
+                    if (val.includes('claude')) cli.value = 'claude';
+                }, { immediate: true });
+
+                const onCliChange = () => {
+                    const list = presets.value[cli.value];
+                    if (list && list.length > 0) emit('update:modelValue', list[0]);
+                };
+
+                return { cli, presets, availableClis, onCliChange };
+            },
+            template: `
+                <div class="p-2 border border-secondary rounded bg-black mb-2">
+                    <div class="mb-2">
+                        <small class="text-muted d-block mb-1" style="font-size: 0.7rem;">CLI BACKEND</small>
+                        <div class="d-flex gap-3 bg-dark p-2 rounded border border-secondary" style="flex-wrap: wrap;">
+                            <div v-for="c in availableClis" :key="c" class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" 
+                                       :name="'cli_' + $.uid" :id="'cli_' + $.uid + '_' + c" 
+                                       :value="c" v-model="cli" @change="onCliChange">
+                                <label class="form-check-label small text-uppercase fw-bold text-light" :for="'cli_' + $.uid + '_' + c" v-text="c"></label>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <small class="text-muted d-block mb-1" style="font-size: 0.7rem;">MODEL PARAMETER (Editable for custom CLI params)</small>
+                        <div class="input-group input-group-sm">
+                            <select class="form-select bg-dark text-light border-secondary" style="max-width: 120px;"
+                                    :value="modelValue"
+                                    @change="$emit('update:modelValue', $event.target.value)">
+                                <option value="" disabled>Presets...</option>
+                                <option v-for="opt in presets[cli]" :key="opt" :value="opt" v-text="opt"></option>
+                            </select>
+                            <input type="text" class="form-control bg-dark text-info border-secondary font-monospace" 
+                                   :value="modelValue"
+                                   @input="$emit('update:modelValue', $event.target.value)"
+                                   placeholder="Exact model string...">
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const app = createApp({
+            components: {
+                'llm-selector': LlmSelector
+            },
             setup() {
                 const currentTab = ref('control');
                 const isRunning = ref(false);
@@ -845,30 +919,6 @@
                 const saveStatus = ref('');
                 let fileModal = null;
                 
-                const standardModels = [
-                    'qwen', 'auto-gemini-3', 'gemini-2.5-pro', 'gemini-2.5-flash', 
-                    'gemini-2.5-flash-lite', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 
-                    'auto-gemini-2.5', 'claude-cli'
-                ];
-                
-                const customBaseCLIs = ['gemini', 'qwen', 'claude'];
-                
-                const parseCustomModel = (modelStr) => {
-                    if (modelStr && modelStr.startsWith('custom:')) {
-                        const parts = modelStr.split(':');
-                        // custom:cli:name
-                        if (parts.length >= 3) {
-                            return { cli: parts[1], name: parts.slice(2).join(':') };
-                        }
-                    }
-                    // Default fallback if just switched to custom or invalid
-                    return { cli: 'gemini', name: '' };
-                };
-                
-                const updateCustomModel = (targetObj, key, cli, name) => {
-                    targetObj[key] = `custom:${cli}:${name}`;
-                };
-
                 const isAtRoot = computed(() => {
                     const norm = (p) => {
                         if (!p) return '';
@@ -934,14 +984,20 @@
 
                 const onScriptSelect = () => {
                     if (selectedScriptIndex.value === null) return;
-                    selectedScript.value = scriptsList.value[selectedScriptIndex.value];
+                    
+                    const s = scriptsList.value[selectedScriptIndex.value];
                     scriptForm.value = {};
-                    // Pre-fill defaults
-                    if (selectedScript.value.inputs) {
-                        selectedScript.value.inputs.forEach(f => {
+                    
+                    // Pre-fill defaults & Inject Dynamic Options
+                    if (s.inputs) {
+                        s.inputs.forEach(f => {
+                            // Set default value
                             scriptForm.value[f.id] = f.default;
                         });
                     }
+                    
+                    // Trigger Render AFTER state is ready
+                    selectedScript.value = s;
                 };
 
                 const runScript = async () => {
@@ -1067,6 +1123,12 @@
                 let lastMousePos = { x: 0, y: 0 };
 
                 onMounted(async () => {
+                    // Load Models
+                    try {
+                        const res = await fetch('/api/models');
+                        if (res.ok) sharedModels.value = await res.json();
+                    } catch(e) { console.error("Failed to load models:", e); }
+
                     try {
                         // Init Bootstrap Modal
                         fileModal = new bootstrap.Modal(document.getElementById('fileModal'));
@@ -1409,8 +1471,9 @@
                     };
                     
                     if (type === 'llm_generate') newNode.config = { 
-                        model: 'auto', timeout: 600, user_template: '', 
-                        session_mode: 'new', response_output: 'llm_response', session_id_output: 'session_id' 
+                        model: 'auto-gemini-3', timeout: 600, user_template: '', 
+                        session_mode: 'new', response_output: 'llm_response', session_id_output: 'session_id',
+                        file_permission_mode: 'open', lock_parent: false, no_exec_files: ''
                     };
                     else if (type === 'subloop') newNode.config = { sub_graph: { nodes:[], edges:[] } };
                     else if (type === 'lesson') newNode.config = { lookback_count: 5, scope: 'Same Branch/Layer', filter: 'Failures Only', output_var: 'lessons' };
@@ -1428,6 +1491,7 @@
                 };
 
                 const nodeMouseDown = (ev, node) => {
+                    ev.stopPropagation();
                     isDraggingNode = true;
                     selectedNode.value = node;
                     selectedEdge.value = null;
@@ -2117,8 +2181,7 @@
                     refreshWorkflow, apiAction, saveAsWorkflow, loadFromPath, startTour,
                     addGlobalVar, removeGlobalVar, renameGlobalVar, saveConfig, saveConfigAs, loadConfigFrom,
                     explorerChatMessages, explorerChatInput, explorerIsChatting, explorerChatModel, 
-                    explorerChatMinimized, explorerChatContainer, explorerChatYolo, sendExplorerChatMessage, resetExplorerChatSession,
-                    standardModels, customBaseCLIs, parseCustomModel, updateCustomModel
+                    explorerChatMinimized, explorerChatContainer, explorerChatYolo, sendExplorerChatMessage, resetExplorerChatSession
                 };
             }
         }).mount('#app');

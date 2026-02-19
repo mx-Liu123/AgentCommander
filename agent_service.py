@@ -18,11 +18,11 @@ from concurrent.futures import ThreadPoolExecutor
 # Ensure we can import from local modules
 sys.path.append(os.getcwd())
 try:
-    from pylib import json_history, llm_client
+    from pylib import json_history, llm_client, llm_task
 except ImportError:
     # If running from a subdir, try adding parent
     sys.path.append(str(Path(os.getcwd()).parent))
-    from pylib import json_history, llm_client
+    from pylib import json_history, llm_client, llm_task
 
 # Constants
 EXAMPLE_WORKSPACE_DIR = "Branch_example/exp_example"
@@ -258,54 +258,32 @@ class GraphExecutor:
         cfg = node.get("config", {})
         user_tmpl = cfg.get("user_template", "")
         context_vars = self._prepare_context_vars()
-        # Debug: Print keys to check availability
-        self.logger.log(f"DEBUG: Context Keys: {list(context_vars.keys())}")
-        self.logger.log(f"DEBUG: cycle value: {context_vars.get('cycle')}")
-        
         prompt = self.recursive_format(user_tmpl, context_vars)
         
-        # --- File Permission & Snapshot Logic ---
         perm_mode = cfg.get("file_permission_mode", "open") # open, whitelist, blacklist, forbid
         target_files_str = cfg.get("target_files", "")
+        no_exec_files_str = cfg.get("no_exec_files", "")
         allow_new_files = cfg.get("allow_new_files", False)
+        lock_parent = cfg.get("lock_parent", False)
+        timeout = cfg.get("timeout", 600)
+        model = cfg.get("model", "auto-gemini-3")
         
-        # Normalize allowed/blocked paths
-        target_paths = []
-        if perm_mode in ["whitelist", "blacklist"] and target_files_str:
-            target_paths = [Path(p.strip()) for p in target_files_str.split(',') if p.strip()]
-
-        cwd_path = Path(self.context.get("current_exp_path", self.service.tasks_dir))
-        if not cwd_path.exists(): cwd_path = self.service.tasks_dir
-        
-        snapshot_path = None
-
-        # System Prompt Injection
+        # System Prompt Injection (Preserved logic)
         if perm_mode == "whitelist":
-            msg = f"\n\n[SYSTEM: FILE PERMISSION]\nYou are allowed to modify ONLY the following files/folders: [{target_files_str}]."
-            if allow_new_files: msg += "\nYou are ALLOWED to create NEW files."
-            else: msg += "\nYou are NOT allowed to create new files (unless in the whitelist)."
-            msg += "\nViolating these rules will result in your changes being reverted."
-            prompt += msg
-            
+            prompt += f"\n\n[SYSTEM: FILE PERMISSION]\nYou are allowed to modify ONLY the following files/folders: [{target_files_str}]."
+            if allow_new_files: prompt += "\nYou are ALLOWED to create NEW files."
+            else: prompt += "\nYou are NOT allowed to create new files (unless in the whitelist)."
+            prompt += "\nViolating these rules will result in your changes being reverted."
         elif perm_mode == "blacklist":
-            msg = f"\n\n[SYSTEM: FILE PERMISSION]\nYou are FORBIDDEN from modifying or creating the following files/folders: [{target_files_str}]."
-            if allow_new_files: msg += "\nYou are ALLOWED to create other new files."
-            else: msg += "\nYou are NOT allowed to create any new files."
-            prompt += msg
-
+            prompt += f"\n\n[SYSTEM: FILE PERMISSION]\nYou are FORBIDDEN from modifying or creating the following files/folders: [{target_files_str}]."
+            if allow_new_files: prompt += "\nYou are ALLOWED to create other new files."
+            else: prompt += "\nYou are NOT allowed to create any new files."
         elif perm_mode == "forbid":
-            msg = f"\n\n[SYSTEM: FILE PERMISSION]\nYou are operating in STRICT READ-ONLY mode for existing files."
-            if allow_new_files: msg += "\nHowever, you are ALLOWED to create NEW files."
-            else: msg += "\nYou are NOT allowed to create or modify ANY files."
-            prompt += msg
+            prompt += "\n\n[SYSTEM: FILE PERMISSION]\nYou are operating in STRICT READ-ONLY mode for existing files."
+            if allow_new_files: prompt += "\nHowever, you are ALLOWED to create NEW files."
+            else: prompt += "\nYou are NOT allowed to create or modify ANY files."
             
-        # Create Snapshot if needed
-        if perm_mode in ["whitelist", "blacklist", "forbid"]:
-            snapshot_path = cwd_path.parent / (cwd_path.name + "_snapshot")
-            if snapshot_path.exists(): shutil.rmtree(snapshot_path)
-            shutil.copytree(cwd_path, snapshot_path)
-        
-        # Determine Session ID
+        # Session Management
         session_mode = cfg.get("session_mode", "new") # new / inherit
         session_id_input_var = cfg.get("session_id_input", "")
         session_id = None
@@ -316,145 +294,44 @@ class GraphExecutor:
                 self.logger.log(f"⚠️ Inherit session var '{session_id_input_var}' is empty/missing. Fallback to AUTO_RESUME (-r).")
                 session_id = "AUTO_RESUME"
 
-        # Default model settings
-        timeout = cfg.get("timeout", 600)
-        model = cfg.get("model", "claude-cli")
+        cwd_path = Path(self.context.get("current_exp_path", self.service.tasks_dir))
+        if not cwd_path.exists(): cwd_path = self.service.tasks_dir
         
-        # Output Variable Names
-        response_var = cfg.get("response_output", "last_response")
-        session_id_output_var = cfg.get("session_id_output", "last_session_id")
-
-        self.context["last_prompt"] = prompt
-        response = ""
-        new_session_id = None
+        self.logger.log(f"      🗣️  LLM Call ({model}, {session_mode}) in {cwd_path.name}...")
         
-        self.logger.log(f"      🗣️  LLM Call ({model}, {session_mode}) in {cwd_path}...")
-        
-        start_time = time.time()
-        if model == "claude-cli":
-            cmd = [
-                "claude", "-p", prompt, 
-                "--output-format", "json", 
-                "--dangerously-skip-permissions",
-                "--tools", "Bash,Write,Read", 
-                "--allowed-tools", "Write,Bash,Read"
-            ]
-            if session_id: cmd.extend(["-r", session_id])
-            try:
-                res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=str(cwd_path))
-                if res.returncode == 0:
-                    try:
-                        data = json.loads(res.stdout)
-                        response = data.get("result", "")
-                        new_session_id = data.get("session_id", session_id)
-                    except: response = res.stdout
-                else:
-                    self.logger.error(f"Claude Error: {res.stderr}")
-            except Exception as e: self.logger.error(str(e))
-        else:
-            try:
-                response, new_session_id = llm_client.call_gemini(prompt, session_id, timeout=timeout, model=model, cwd=str(cwd_path))
-            except Exception as e: self.logger.error(str(e))
+        # Delegate to llm_task
+        try:
+            target_files = [f.strip() for f in target_files_str.split(',') if f.strip()]
+            no_exec_list = [f.strip() for f in no_exec_files_str.split(',') if f.strip()]
             
-        duration = time.time() - start_time
-        if duration < 1:
-            self.logger.log(f"⚠️ Warning: LLM response was extremely fast ({duration:.2f}s). This usually means the CLI backend failed or is not configured (e.g., installation/Oauth prob/model name). If using Gemini, try running 'gemini -r' inside the experiment directory to see the raw error.")
-
-        self.context["last_response"] = response
-        
-        # --- Restore / Enforce File Permissions ---
-        if snapshot_path and snapshot_path.exists():
-            def is_allowed(target_p):
-                # Returns True if the specific file is allowed by the RULES (Whitelist/Blacklist)
-                # Does NOT handle "Allow New" logic, that's handled in the loop.
-                if perm_mode == "open": return True
-                if perm_mode == "forbid": return False
+            response, new_session_id = llm_task.run_task(
+                prompt=prompt,
+                model=model,
+                cwd=str(cwd_path),
+                permission_mode=perm_mode,
+                whitelist=target_files if perm_mode == "whitelist" else None,
+                blacklist=target_files if perm_mode == "blacklist" else None,
+                allow_new_files=allow_new_files,
+                timeout=timeout,
+                session_id=session_id,
+                lock_parent=lock_parent,
+                no_exec_list=no_exec_list
+            )
+            
+            self.context["last_response"] = response
+            self.context["last_prompt"] = prompt
+            
+            # Save Session ID
+            session_id_output_var = cfg.get("session_id_output", "last_session_id")
+            if session_id_output_var:
+                self.context[session_id_output_var] = new_session_id
                 
-                is_listed = False
-                for t in target_paths:
-                    if target_p == t: is_listed = True; break
-                    try: 
-                        target_p.relative_to(t)
-                        is_listed = True; break
-                    except: continue
-                
-                if perm_mode == "whitelist": return is_listed
-                if perm_mode == "blacklist": return not is_listed
-                return False
-
-            # 1. Check for NEW or MODIFIED files
-            for current_file in cwd_path.rglob('*'):
-                if current_file.is_dir(): continue
-                if current_file.name == 'history.json': continue 
-                
-                try: rel_path = current_file.relative_to(cwd_path)
-                except: continue
-                
-                snap_file = snapshot_path / rel_path
-                
-                is_new = not snap_file.exists()
-                
-                if is_new:
-                    should_delete = False
-                    
-                    if allow_new_files:
-                        # Generically Allowed. 
-                        # Exception: Blacklist mode blocks specific new files
-                        if perm_mode == "blacklist" and not is_allowed(rel_path):
-                            should_delete = True
-                    else:
-                        # Generically Blocked.
-                        # Exception: Whitelist mode allows specific new files
-                        if perm_mode == "whitelist" and is_allowed(rel_path):
-                            should_delete = False
-                        else:
-                            should_delete = True
-                            
-                    if should_delete:
-                        self.logger.log(f"🛡️ Security: Deleting unauthorized new file {rel_path}")
-                        try: current_file.unlink()
-                        except: pass
-
-                else: # Modified Existing File
-                    # Must be allowed by mode logic (Whitelist/Blacklist/Strict)
-                    # "Allow New Files" does not affect existing files.
-                    if not is_allowed(rel_path):
-                        # Read bytes to compare
-                        try:
-                            if current_file.read_bytes() != snap_file.read_bytes():
-                                self.logger.log(f"🛡️ Security: Reverting unauthorized change to {rel_path}")
-                                shutil.copy2(snap_file, current_file)
-                        except: pass
-
-            # 2. Check for DELETED files
-            for snap_file in snapshot_path.rglob('*'):
-                if snap_file.is_dir(): continue
-                rel_path = snap_file.relative_to(snapshot_path)
-                if rel_path.name == 'history.json': continue
-
-                current_file = cwd_path / rel_path
-                
-                if not current_file.exists():
-                    if not is_allowed(rel_path):
-                        self.logger.log(f"🛡️ Security: Restoring deleted file {rel_path}")
-                        try:
-                            current_file.parent.mkdir(parents=True, exist_ok=True)
-                            shutil.copy2(snap_file, current_file)
-                        except: pass
-
-            # Cleanup
-            try: shutil.rmtree(snapshot_path)
-            except: pass
-
-        # --- Update Context with Outputs ---
-        if response_var:
+            # Parse response var
+            response_var = cfg.get("response_output", "last_response")
             self.context[response_var] = response
             
-        if session_id_output_var and new_session_id:
-            self.context[session_id_output_var] = new_session_id
-                
-        # --- Restore Root Files ---
-        # self.service.restore_root_files()
+        except Exception as e:
+            self.logger.error(f"LLM Step Failed: {e}")
 
     def _step_shell(self, node):
         cfg = node.get("config", {})
@@ -617,7 +494,6 @@ class AgentService:
     def __init__(self, tasks_dir, config, log_queue=None, stop_event=None):
         self.tasks_dir = Path(tasks_dir).resolve()
         self.config = config
-        self.venv = config.get("global_vars", {}).get("venv", "python")
         self.process = None
         
         self.stop_event = stop_event if stop_event else multiprocessing.Event()
@@ -874,9 +750,47 @@ class AgentService:
 
 # Helper for multiprocessing
 def agent_process_wrapper(tasks_dir, config, queue, stop_event=None):
-    service = AgentService(tasks_dir, config, queue, stop_event)
-    try:
-        service.run()
-    finally:
-        if queue:
-            queue.put({"type": "status", "data": "stopped"})
+    # Save original streams to keep terminal output alive
+    orig_out = sys.__stdout__ or sys.stdout
+    orig_err = sys.__stderr__ or sys.stderr
+
+    # Setup logging via queue
+    logger = None
+    if queue:
+        class QueueLogger:
+            def log(self, msg): 
+                queue.put({"type": "log", "data": msg})
+                # Echo to terminal
+                try: orig_out.write(f"{msg}\n"); orig_out.flush()
+                except: pass
+
+            def error(self, msg): 
+                queue.put({"type": "error", "data": msg})
+                try: orig_err.write(f"ERROR: {msg}\n"); orig_err.flush()
+                except: pass
+
+            def write(self, msg): 
+                # Always echo to terminal to preserve formatting (newlines)
+                try: orig_out.write(msg); orig_out.flush()
+                except: pass
+
+                # Only send substantive logs to Queue
+                if msg.strip(): 
+                    queue.put({"type": "log", "data": msg.strip()})
+            def flush(self): 
+                try: orig_out.flush()
+                except: pass
+            
+        logger = QueueLogger()
+        # Redirect stdout/stderr to capture all library prints
+        sys.stdout = logger
+        sys.stderr = logger
+    else:
+        # Fallback to local print if no queue
+        class PrintLogger:
+            def log(self, msg): print(f"[Agent] {msg}")
+            def error(self, msg): print(f"[Agent Error] {msg}")
+        logger = PrintLogger()
+
+    service = AgentService(tasks_dir, config, logger, stop_event)
+    service.run()
