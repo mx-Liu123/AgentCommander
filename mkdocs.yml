@@ -39,14 +39,15 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Agent Capability:
+    - Overview: automated-engine/index.md
+    - Evolutionary Strategy: automated-engine/evolution-strategy.md
+    - Inner Loop Logic: automated-engine/inner-loop.md
+    - Safety & Sandbox: automated-engine/safety-sandbox.md
   - Human Supervision:
     - Workflow Design: human-supervision/workflow-design.md
     - White-box Debugging: human-supervision/white-box-debugging.md
     - Visual Feedback: human-supervision/visual-feedback.md
-  - Automated Engine:
-    - Inner Loop Logic: automated-engine/inner-loop.md
-    - Safety & Sandbox: automated-engine/safety-sandbox.md
-    - Evolutionary Strategy: automated-engine/evolution-strategy.md
   - Protocols & Setup:
     - Auto-Setup Wizard: protocols/auto-setup.md
     - BYOC Protocol: protocols/byoc-protocol.md
