@@ -38,7 +38,14 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
+  - Getting Started:
+    - Installation & Launch: getting-started.md
+    - Project Setup:
+      - Auto-Setup Wizard: protocols/auto-setup.md
+      - BYOC Protocol: protocols/byoc-protocol.md
+    - Examples & Guides:
+      - Diabetes Example: guides/diabetes-example.md
+      - HPC/PBS Cluster: guides/hpc-cluster.md
   - Agent Capability:
     - Overview: automated-engine/index.md
     - Evolutionary Strategy: automated-engine/evolution-strategy.md
@@ -50,14 +57,8 @@ nav:
     - File Management: human-supervision/file-management.md
     - White-box Debugging: human-supervision/white-box-debugging.md
     - Visual Feedback: human-supervision/visual-feedback.md
-  - Protocols & Setup:
-    - Auto-Setup Wizard: protocols/auto-setup.md
-    - BYOC Protocol: protocols/byoc-protocol.md
   - Reference & Tips:
     - CLI Guide (Gemini/Qwen): reference/cli-guide.md
     - Configuration: reference/configuration.md
     - Troubleshooting: reference/troubleshooting.md
-  - Guides:
-    - Diabetes Example: guides/diabetes-example.md
-    - HPC/PBS Cluster: guides/hpc-cluster.md
   - Security: security.md
