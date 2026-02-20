@@ -23,8 +23,9 @@ Project_Root/
 
 ## Integrated File Explorer
 
-The **Explorer Tab** in the UI offers more than just viewing files:
+The **Explorer Tab** in the UI offers a deep integration between your data and AI:
 
-*   **Context-Aware Chat**: Ask the AI questions about the *current folder* (e.g., "Summarize the logs here").
-*   **Quick Actions**: Copy paths, rename files, or creating new prototypes manually.
-*   **Read-Only Mode**: Toggle this to safely inspect running experiments without accidental edits.
+*   **Context-Aware Chat**: An embedded AI assistant that treats the currently open folder as its working directory. You can ask questions like "Summarize the error logs in this folder."
+*   **Read-Only Mode**: A safety toggle for the AI Chat. When enabled, the AI can read and analyze files but is **strictly forbidden from modifying or creating files**. This is ideal for safe inspection of running experiments.
+*   **Quick Actions**: Standard file operations including copying paths, renaming, or deleting files manually.
+
