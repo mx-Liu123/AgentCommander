@@ -61,4 +61,3 @@ nav:
     - CLI Guide (Gemini/Qwen): reference/cli-guide.md
     - Configuration: reference/configuration.md
     - Troubleshooting: reference/troubleshooting.md
-  - Security: security.md

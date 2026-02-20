@@ -22,8 +22,16 @@ Before any AI node executes, AgentCommander takes a "snapshot" of the current di
 
 When `lock_parent` is enabled, the system temporarily removes write permissions (`chmod u-w`) from the parent directory of the experiment. This prevents the agent from "escaping" its sandbox and modifying sibling experiments or system files.
 
-## 4. CLI Isolation (YOLO Mode Warning)
+## 4. CLI Permissions (YOLO Mode)
 
-By default, the underlying CLI tools run in `-y` (YOLO) mode to allow tool usage. While AgentCommander restricts *file* access, network and system command access depends on the underlying user permissions.
+By default, the underlying CLI tools operate in **YOLO mode** (e.g., using `yolo` or `skip-dangerous-permission` flags). This grants the model permission to use available tools autonomously within the working directory.
 
-**Best Practice**: Run AgentCommander inside a **Docker Container** or a restricted user account for maximum security.
+### Risks
+*   **Arbitrary Privilege**: While AgentCommander restricts *filesystem* access via its sandbox, the agent still inherits the permissions of the OS user running the process.
+*   **Prompt Injection**: Malicious or poorly designed prompts could theoretically guide an agent to perform unintended actions.
+
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind. The developers are not responsible for any damage, loss of data, or security breaches. 
+
+**Recommendation**: Always run AgentCommander inside a **Docker Container**, Virtual Machine, or a dedicated restricted user account to ensure complete isolation.

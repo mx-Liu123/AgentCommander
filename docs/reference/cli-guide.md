@@ -8,11 +8,11 @@ AgentCommander relies on the underlying CLI tools for model inference. Optimizin
 *   **Authentication**: Run `gemini login` to authenticate with your Google account.
 
 ### 🚀 Enabling Preview Models
-The standard models (e.g., `gemini-pro`) are stable but may lag behind in reasoning capability. For complex coding tasks, we recommend **Gemini 1.5 Pro** or **Flash 2.0**.
+The standard models (e.g., `gemini-pro`) are stable but may lag behind in reasoning capability. For complex coding tasks, we recommend **Gemini 3 Pro** or **Flash 3**.
 
 To access them:
 1.  Ensure you have the latest CLI version.
-2.  When configuring the Agent in the UI, type the model alias manually if it doesn't appear in the dropdown (e.g., `gemini-1.5-pro-latest`).
+2.  When configuring the Agent in the UI, type the model alias manually if it doesn't appear in the dropdown (e.g., `gemini-3-pro-latest`).
 
 ### 🛡️ Context Isolation (Important)
 By default, the CLI maintains a history file (`~/.gemini/GEMINI.md`). If multiple projects write to this file, context pollution can occur.
