@@ -1,8 +1,25 @@
 # Security & Sandbox System
 
-One of the primary challenges in autonomous coding agents is safety. AgentCommander addresses this with a multi-layer "Soft Sandbox" built on top of the filesystem.
+AgentCommander addresses the safety challenges of autonomous agents with a multi-layer "Soft Sandbox" built on top of the filesystem.
 
-## 1. No-Exec Mechanism (Execution Ban)
+## Directory-Level Sandboxing
+
+Unlike other agent frameworks where file system isolation can be difficult to enforce, the CLI-based approach allows AgentCommander to strictly limit the agent's read/write access to specific experiment directories. This ensures that the agent can freely experiment within its sandbox without risking modifications to your system-level files.
+
+*   **Isolation**: The CLI tools focus on files within the specified working directory (`root_dir`). 
+*   **Transparent Debugging (White-box)**: Every experiment runs in its own folder. You can simply `cd` into any experiment directory and run `gemini -r`, `qwen -c`, or `opencode -c` to **resume the conversation**. This allows you to inspect the final formatted prompt, review the history, and manually intervene.
+
+## File Permission Modes (LLM Nodes)
+
+To prevent LLM agents from modifying unauthorized files, AgentCommander implements a strict File Permission System for each `llm_generate` node:
+
+*   **Strict (Read-Only)**: The LLM is strictly forbidden from modifying existing files.
+*   **Restricted (Whitelist/Blacklist)**: The LLM can only modify the files or folders explicitly listed (e.g., `strategy.py`).
+*   **Open (Allow All)**: Unrestricted access within the working directory.
+
+**Enforcement**: The system creates a filesystem snapshot before execution and compares it after. Any unauthorized changes are immediately **reverted**.
+
+## No-Exec Mechanism (Execution Ban)
 
 To prevent agents from accidentally (or maliciously) executing unfinished or dangerous code during the generation phase, we implement a strict **No-Exec Lock**:
 

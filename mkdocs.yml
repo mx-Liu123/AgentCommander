@@ -58,6 +58,7 @@ nav:
     - White-box Debugging: human-supervision/white-box-debugging.md
     - Visual Feedback: human-supervision/visual-feedback.md
   - Reference & Tips:
+    - Tips & Best Practices: reference/tips.md
     - CLI Guide (Gemini/Qwen): reference/cli-guide.md
     - Configuration: reference/configuration.md
     - Troubleshooting: reference/troubleshooting.md

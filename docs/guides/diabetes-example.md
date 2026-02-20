@@ -17,6 +17,21 @@ You can verify your installation immediately by running our pre-configured Sciki
 ## Location
 `example/diabetes_sklearn`
 
+## Reference Experiment Structure
+
+The `example/diabetes_sklearn/` directory provides a reference implementation for organizing machine learning experiments. It is designed to be robust and prevent "cheating" by the LLM.
+
+### File Organization
+*   **Evaluation Script (`evaluator.py`)**: The ground truth for assessment. Includes built-in anti-leakage checks and enforces time limits.
+*   **Seed Experiment Directory**: Contains the initial `strategy.py` and auxiliary files.
+*   **Experiment History (`history.json`)**: Automatically stores metrics and optimal results.
+
+### Evolutionary Progress Logic (B, L, S)
+The default workflow uses a **Branch (B)**, **Level (L)**, **Step (S)** logic:
+*   **Branch (B)**: A new conceptual direction.
+*   **Level (L)**: Progression in depth (advanced on significant improvement).
+*   **Step (S)**: Explorations within the same level (retries/mutations).
+
 ## Structure
 *   `strategy.py`: Defines the Model and Hyperparameter Space.
 *   `evaluator.py`: Runs Grid Search and reports MSE.
