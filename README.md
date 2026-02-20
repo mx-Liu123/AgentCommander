@@ -7,6 +7,10 @@
 [![Documentation](https://img.shields.io/badge/📖_Docs-Read_Now-green?style=for-the-badge&logo=gitbook)](https://mx-Liu123.github.io/AgentCommander/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-8E75B2?style=flat)](https://ai.google.dev/)
+[![Qwen CLI](https://img.shields.io/badge/Qwen_CLI-525CB0?style=flat)](https://github.com/QwenLM/qwen-agent)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-D97757?style=flat)](https://www.anthropic.com/)
+[![OpenCode](https://img.shields.io/badge/OpenCode-4285F4?style=flat)](https://opencode.ai/)
 
 📧 **Contact:** [miaoxin.liu@u.nus.edu](mailto:miaoxin.liu@u.nus.edu) | 📖 **Documentation:** [Read Online](https://mx-Liu123.github.io/AgentCommander/)
 
