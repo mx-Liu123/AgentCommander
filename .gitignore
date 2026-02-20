@@ -40,5 +40,10 @@ run_all_merged*
 !main_pic.png
 !progress_tree.png
 !workflow_editor.png
+!auto_setup.png
+
+# Allow images in documentation
+!docs/assets/images/*.png
+
 my_new_experiment_sc2/
 test_leak.txt

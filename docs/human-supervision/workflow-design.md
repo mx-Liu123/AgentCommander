@@ -2,6 +2,8 @@
 
 The Workflow Editor is the command center of AgentCommander. It allows you to visually design the logic flow of your AI agents.
 
+![Workflow Editor](assets/images/workflow_editor.png)
+
 ## Key Concepts
 
 *   **Nodes**: Individual steps (e.g., LLM Generation, Python Script, Shell Command).

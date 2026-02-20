@@ -6,6 +6,8 @@ Tracking hundreds of experiments is impossible with just a console log. AgentCom
 
 Located in the **Control Panel**, this graph dynamically updates as the agent explores.
 
+![Progress Tree](assets/images/progress_tree.png)
+
 ### Visual Guide
 *   **Nodes**: Each node represents a unique experiment folder (e.g., `exp1.2.1`).
 *   **Edges**: Directed lines show the inheritance path (Parent $\to$ Child).

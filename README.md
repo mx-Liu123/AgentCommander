@@ -24,7 +24,7 @@ AgentCommander fills this gap. It is built on the belief that repetitive iterati
 
 ## What is AgentCommander?
 
-![AgentCommander Concept](main_pic.png)
+![AgentCommander Concept](docs/assets/images/main_pic.png)
 
 **AgentCommander was born from the actual demands of scientific research.**
 
@@ -41,7 +41,7 @@ Refined through rigorous practical application, it is a graph-based workflow eng
 ## Contact
 📧 **Email:** [miaoxin.liu@u.nus.edu](mailto:miaoxin.liu@u.nus.edu)
 
-![Control Panel](control_panel.png)
+![Control Panel](docs/assets/images/control_panel.png)
 
 ## Architecture & Safety
 
@@ -57,16 +57,17 @@ One of the primary challenges in autonomous coding agents is safety. We specific
 *   **Hierarchical Visual Workflow Editor with AI Assistant**: Adopts a sophisticated two-layer architecture to balance granular control with high-level evolution.
     *   **Inner Subloop (Experiment Lifecycle)**: Encapsulates the rigorous execution logic within a single experiment folder (e.g., Hypothesis Generation $\to$ Code Implementation $\to$ Evaluation $\to$ Result Analysis).
     *   **Outer Control Plane (Evolutionary Strategy)**: Orchestrates the macro-level logic *between* experiments. This layer manages **lineage inheritance** (cloning and mutating the best strategies), **meta-learning** (extracting lessons from failed branches), and **external exploration** (injecting fresh ideas via web search), ensuring the system evolves continuously rather than just iterating blindly.
-    *   **AI-Assisted Design**: Modify this complex topology directly via natural language commands (e.g., "Add a shell check after step 2").
-![Workflow Editor](workflow_editor.png)
-*   **Visual Feedback Loop (Sub-Loop)**: Capable of **multimodal analysis**. If your experiment generates plots (e.g., `best_result.png`), the workflow can feed them back to vision-capable agents (via `@filename` syntax). This allows the AI to perform qualitative analysis—such as spotting overfitting or bias—and adjust its strategy accordingly.
+        *   **AI-Assisted Design**: Modify this complex topology directly via natural language commands (e.g., "Add a shell check after step 2").
+    ![Workflow Editor](docs/assets/images/workflow_editor.png)
+    *   **Visual Feedback Loop (Sub-Loop)**: Capable of **multimodal analysis**.
+     If your experiment generates plots (e.g., `best_result.png`), the workflow can feed them back to vision-capable agents (via `@filename` syntax). This allows the AI to perform qualitative analysis—such as spotting overfitting or bias—and adjust its strategy accordingly.
 *   **Context-Aware File Explorer**: The built-in File Explorer features an embedded **AI Chat** that treats the currently open folder as its working directory. You can ask questions about your data ("Summarize history.json") and toggle **Read-Only Mode** for safe inspection.
 *   **Multi-Model CLI Integration**: Deeply integrated with both **Gemini CLI** and **Qwen CLI** for powerful, prompt-driven code generation and analysis. Choose the backend that best fits your needs directly from the UI.
 *   **Inherited CLI Skills**: Because it sits on top of the CLI ecosystem, AgentCommander inherits all the native capabilities of the underlying CLI tools. Any "skill" supported by Gemini/Qwen CLI (e.g., web search, file management, system commands) is automatically available to your agents within the workflow.
 *   **Infinite Iteration & Advanced Learning**: Create self-improving loops where the agent experiments, learns from failures, and refines its strategy indefinitely. Advanced features like the **"Lesson" mechanism** (to learn from past errors) and **online search integration** (for inspiration) are available in example workflows to boost continuous improvement.
 *   **ML & Symbolic Regression**: Specifically tailored to assist in discovering mathematical formulas and optimizing ML models through iterative experimentation.
 *   **Experiment Management & Evolutionary Tree**: Automatically track and visualize experiment history, metrics, and branches as an **"evolutionary tree"**, where each experiment node connects to its parent.
-![Progress Tree](progress_tree.png)
+![Progress Tree](docs/assets/images/progress_tree.png)
 *   **Dynamic Configuration**: Manage global variables and system settings through a centralized UI.
 
 ## Installation

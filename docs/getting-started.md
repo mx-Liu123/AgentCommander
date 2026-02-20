@@ -36,6 +36,8 @@
     ```
     This will start the web server at `http://localhost:8080`.
 
+![Control Panel](assets/images/control_panel.png)
+
 ## Next Steps
 
 Now that the server is running, you have two paths:

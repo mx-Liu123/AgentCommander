@@ -4,7 +4,8 @@ from .base import BaseAdapter
 class ClaudeAdapter(BaseAdapter):
     def build_command(self, prompt, session_id, model, yolo):
         # Claude CLI construction
-        cmd = ["claude", "--output-format", "json"]
+        # -p: Print mode (non-interactive, one-shot)
+        cmd = ["claude", "-p", "--output-format", "json"]
         
         cmd.append("--dangerously-skip-permissions")
         
@@ -14,11 +15,9 @@ class ClaudeAdapter(BaseAdapter):
         if session_id and session_id != "AUTO_RESUME":
              cmd.extend(["-r", session_id])
              
-        # If the user passed a specific model (not just "claude-cli"), try to pass it?
-        # Standard claude-cli might check config, but if -m is supported:
+        # If the user passed a specific model (not just "claude-cli"), pass it via --model
         if model and model != "claude-cli":
-             # Assuming CLI supports -m for model selection if provided
-             cmd.extend(["-m", model])
+             cmd.extend(["--model", model])
              
         return cmd
 
