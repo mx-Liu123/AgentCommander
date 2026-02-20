@@ -1,6 +1,18 @@
 # Auto-Setup Wizard
 
-The Auto-Setup Wizard (`scripts/ml_autosetup_*.sh`) is the fastest way to initialize a robust, AgentCommander-compatible experiment environment.
+The Auto-Setup Wizard is the fastest way to initialize a robust, AgentCommander-compatible experiment environment.
+
+## Using the UI Wizard (Recommended)
+
+The easiest way to start is using the built-in **Experiment Setup** wizard directly in the web UI.
+
+1.  **Navigate to "Setup"**: Click the "Experiment Setup" tab in the UI sidebar.
+2.  **Select a Template**:
+    *   **`[Case: You only have Dataset]`**: Corresponds to Scenario 1 below.
+    *   **`[Case: You have Training Code]`**: Corresponds to Scenario 2 below.
+3.  **Configure**: Fill in the required fields (e.g., Project Name, Absolute Path to Data).
+4.  **Launch**: Click **🚀 Run Setup Script**.
+    *   The integrated console will show the setup progress as it creates directories, splits data, and generates the initial `evaluator.py`.
 
 ## Scenario 1: Data-Only (`ml_autosetup_1`)
 
