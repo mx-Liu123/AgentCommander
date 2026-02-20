@@ -34,7 +34,18 @@ Refined through rigorous practical application, it is a graph-based workflow eng
 
 Unlike "black-box" agents, AgentCommander prioritizes **Human-Centric Evolution**. You define the search space and evaluation logic; the agent handles the exhaustive execution loop.
 
-## Core Features
+## Agent Capabilities (The Loop of Discovery)
+
+Inside the workflow, the AI acts as an autonomous researcher, capable of:
+*   **Hypothesis & Reasoning**: Analyzing current code and historical results to formulate logical improvements.
+*   **Autonomous Coding & Debugging**: Implementing changes in `strategy.py` and iteratively fixing errors based on execution logs.
+*   **Multimodal Visual Feedback**: "Seeing" and interpreting generated plots (e.g., loss curves, scatter plots) to detect qualitative issues like overfitting or bias.
+*   **Meta-Learning & External Inspiration**: When stuck, the agent can trigger an **online search** to find fresh inspiration from **Arxiv papers** or **GitHub repositories**, helping it break through local optima.
+*   **Knowledge Evolution**: Learning from both success and failure. The system extracts "Lessons" from past attempts and persists them into `history.json`, allowing the agent to refine its strategy and evolve across generations.
+
+## Core Features for Humans
+
+AgentCommander provides a high-level control plane for researchers to steer the evolution:
 
 *   **Hierarchical Workflows**: Orchestrate macro-level evolutionary strategies (Outer Loop) and micro-level experiment execution (Inner Loop). The **Progress Tree Visualization** allows you to monitor the overall lineage and evolutionary status across branches and generations at a glance.
 ![Progress Tree](docs/assets/images/progress_tree.png)
