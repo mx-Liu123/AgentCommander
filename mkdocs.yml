@@ -46,6 +46,8 @@ nav:
     - Safety & Sandbox: automated-engine/safety-sandbox.md
   - Human Supervision:
     - Workflow Design: human-supervision/workflow-design.md
+    - Evolutionary Tree: human-supervision/evolution-tree.md
+    - File Management: human-supervision/file-management.md
     - White-box Debugging: human-supervision/white-box-debugging.md
     - Visual Feedback: human-supervision/visual-feedback.md
   - Protocols & Setup:
