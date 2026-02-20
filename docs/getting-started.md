@@ -43,9 +43,9 @@
 Now that the server is running, you have two paths:
 
 1.  **Initialize a New Project**: Use the Auto-Setup Wizard to scaffold your environment.
-    *   👉 Go to **"Protocols & Setup" > "Auto-Setup Wizard"**.
+    *   👉 See **"Project Setup" > "Auto-Setup Wizard"**.
 2.  **Run a Demo**: Try the included Diabetes example to see the agent in action immediately.
-    *   👉 Go to **"Guides" > "Diabetes Example"**.
+    *   👉 See **"Examples & Guides" > "Diabetes Example"**.
 
 For advanced configuration (e.g., enabling Gemini Pro), check **"Reference & Tips" > "CLI Guide"**.
 

@@ -8,7 +8,6 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Gemini CLI](https://img.shields.io/badge/Powered%20by-Gemini%20CLI-8E75B2)](https://ai.google.dev/)
 
 </div>
 
@@ -119,18 +118,8 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
 
 > 💡 **Tip**: Look for the **question mark (?) icon** in various parts of the UI (Control Panel, File Explorer, Workflow Editor). Clicking it will start a **guided tour** to help you understand the features of that specific section.
 
-1.  **Start the UI Server:**
-    *(If running for the first time, please rename `config_template.json` to `config.json` and configure it to match your environment).*
-    ```bash
-    bash run_ui.sh
-    ```
-    This will start the web server (default port 8080) and open the UI.
-
-2.  **Access the UI:**
-    Open your browser and navigate to `http://localhost:8080`.
-
 3.  **Load Configuration:**
-    *   The system will automatically create a default `config.json` if one is missing.
+    *   *(If running for the first time, please rename `config_template.json` to `config.json` and configure it to match your environment).*
     *   You can load example configurations or create your own in the "Control Panel".
 
 4.  **Run an Example Task:**
@@ -141,8 +130,12 @@ To leverage the latest capabilities, including the powerful Pro3 and Flash3 mode
 
 ## Project Setup Wizard (Auto-Setup)
 
-For new projects, AgentCommander provides an **Auto-Setup Wizard** (`scripts/ml_autosetup_1/auto_setup.sh`) to instantly scaffold a robust experiment environment.
+For new projects, AgentCommander provides an **Auto-Setup Wizard** accessible via the **"Experiment Setup"** tab in the UI. This supports two primary scenarios:
 
+*   **[Case: You only have Dataset] (`ml_autosetup_1`)**: Scaffolds a complete project (splitting, strategy, and evaluator) from just raw data (`X.npy`, `Y.npy`).
+*   **[Case: You have Training Code] (`ml_autosetup_2`)**: Adapts your existing training script into the Agent system. Requires your code to follow a simple interface (saving weights and implementing a loading function) for independent evaluation.
+
+### Quick Workflow (via CLI):
 1.  **Prepare Data**: Place your features and labels in a directory as `X.npy` and `Y.npy`.
 2.  **Run Wizard**: Execute `bash scripts/ml_autosetup_1/auto_setup.sh` and provide the path to your data directory when prompted.
 3.  **Automated Scaffolding**: The script will:
