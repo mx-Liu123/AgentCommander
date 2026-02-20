@@ -7,9 +7,8 @@
     *   [Gemini CLI](https://github.com/google/gemini-cli) (Recommended): `npm install -g @google/gemini-cli@latest`
         *   *Tip*: Enable "Gemini Preview" in settings to access Pro 3/Flash 3 models.
     *   [Qwen CLI](https://github.com/qwen-cli): `npm install -g @qwen/cli`
-        *   *Tip*: Qwen offers a free tier via OAuth.
-    *   **OpenCode AI**: `npm install -g opencode-ai`
-    *   **Claude Code**: `npm install -g @anthropic-ai/claude-code`
+    *   [OpenCode AI](https://opencode.ai): `npm install -g opencode-ai`
+    *   [Claude Code](https://github.com/anthropic-ai/claude-code): `npm install -g @anthropic-ai/claude-code`
 
 ## Installation
 
