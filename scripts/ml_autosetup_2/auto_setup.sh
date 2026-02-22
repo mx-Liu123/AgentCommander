@@ -189,7 +189,7 @@ else
 fi
 
 DEFAULT_VENV="/home/$USER/.conda/envs/agent_commander/bin/python"
-get_input "PYTHON_PATH" "Python Interpreter Path" "$DEFAULT_VENV"
+get_input "VENV_PYTHON" "Python Interpreter Path" "$DEFAULT_VENV"
 
 echo -e "\n--- Evaluation Config ---"
 
@@ -391,7 +391,7 @@ REQUIREMENTS: \
         
         # 1. Run Training
         echo "Running Strategy (Training)..."
-        if ! "$PYTHON_PATH" strategy.py > train_log.txt 2>&1; then
+        if ! "$VENV_PYTHON" strategy.py > train_log.txt 2>&1; then
             echo "❌ Training Failed."
             cat train_log.txt | tail -n 20
             exit 101
@@ -401,7 +401,7 @@ REQUIREMENTS: \
         
         # 2. Run Evaluation
         echo "Running Evaluator..."
-        if ! "$PYTHON_PATH" evaluator.py > eval_out.txt 2>&1; then
+        if ! "$VENV_PYTHON" evaluator.py > eval_out.txt 2>&1; then
             echo "❌ Evaluation Failed."
             cat eval_out.txt
             exit 102
@@ -493,13 +493,14 @@ if [ -f "$EXP_DIR/evaluator.py" ]; then
     current_dir=$(pwd)
     cd "$EXP_DIR" || exit
     # Capture output and trim whitespace
-    PLOT_OUTPUT=$("$PYTHON_PATH" "evaluator.py" --dry-run-plot 2>/dev/null | tr -d '[:space:]')
+    PLOT_OUTPUT=$("$VENV_PYTHON" "evaluator.py" --dry-run-plot 2>/dev/null | tr -d '[:space:]')
     cd "$current_dir" || exit
 fi
 
 # Export vars for Python script
 export PROJECT_NAME
-export PYTHON_PATH
+export VENV_PYTHON
+export EVAL_CMD
 export PLOT_OUTPUT
 export TASK_BG_TEXT
 export METRIC_TEXT
@@ -529,7 +530,7 @@ try:
     
     # Construct sequential eval_cmd for Agent usage (Train then Eval)
     py = os.environ['VENV_PYTHON']
-    data['global_vars']['eval_cmd'] = f"{py} strategy.py && {py} evaluator.py"
+    data['global_vars']['eval_cmd'] = os.environ.get('EVAL_CMD', f"{py} strategy.py && {py} evaluator.py")
     
     # Plot names with fallback
     plot_out = os.environ.get('PLOT_OUTPUT', '')

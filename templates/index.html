@@ -270,6 +270,9 @@
                                         <button class="btn btn-sm btn-outline-info" @click="loadScripts">↻ Refresh Scripts</button>
                                     </div>
                                     <div class="card-body">
+                                        <div class="mb-3 rounded border border-secondary" style="overflow: hidden;">
+                                            <video src="/static/auto_setup_instrut_vedio.mp4" controls width="100%" muted style="display: block;"></video>
+                                        </div>
                                         <label class="form-label text-muted small uppercase fw-bold">Select Script Template</label>
                                         <select class="form-select bg-dark text-light border-secondary mb-3" v-model="selectedScriptIndex" @change="onScriptSelect">
                                             <option v-for="(script, idx) in scriptsList" :value="idx">

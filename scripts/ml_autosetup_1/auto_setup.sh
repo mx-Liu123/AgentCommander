@@ -192,7 +192,7 @@ else
 fi
 
 DEFAULT_VENV="/home/$USER/.conda/envs/agent_commander/bin/python"
-get_input "PYTHON_PATH" "Python Interpreter Path" "$DEFAULT_VENV"
+get_input "VENV_PYTHON" "Python Interpreter Path" "$DEFAULT_VENV"
 
 DEFAULT_RESERVED=0.05
 get_input "RESERVED_RATIO" "Reserved Data Ratio (0-1)" "$DEFAULT_RESERVED"
@@ -255,7 +255,7 @@ echo "[Setup] Files copied to $EXP_DIR"
 
 echo -e "\n[Data] Running split_data.py on $DATA_DIR..."
 # We use the system python or custom python to run the split script? Use custom for safety
-"$PYTHON_PATH" "$PROJECT_ROOT/split_data.py" "$DATA_DIR" "$RESERVED_RATIO"
+"$VENV_PYTHON" "$PROJECT_ROOT/split_data.py" "$DATA_DIR" "$RESERVED_RATIO"
 
 if [ $? -ne 0 ]; then
     echo "Error: Data splitting failed."
@@ -421,7 +421,7 @@ $EXTRA_INSTRUCTION"
 
         # Run a quick check using python -c. We assume evaluate returns a float (score) or raises error.
         # We use tee to show output in real-time while capturing it.
-        "$PYTHON_PATH" -u -c "
+        "$VENV_PYTHON" -u -c "
 import sys
 try:
     from evaluator import evaluate
@@ -527,13 +527,14 @@ if [ -f "$EXP_DIR/evaluator.py" ]; then
     current_dir=$(pwd)
     cd "$EXP_DIR" || exit
     # Capture output and trim whitespace
-    PLOT_OUTPUT=$("$PYTHON_PATH" "evaluator.py" --dry-run-plot 2>/dev/null | tr -d '[:space:]')
+    PLOT_OUTPUT=$("$VENV_PYTHON" "evaluator.py" --dry-run-plot 2>/dev/null | tr -d '[:space:]')
     cd "$current_dir" || exit
 fi
 
 # Export vars for Python script
 export PROJECT_NAME
-export PYTHON_PATH
+export VENV_PYTHON
+export EVAL_CMD
 export PLOT_OUTPUT
 export TASK_BG_TEXT
 export METRIC_TEXT
@@ -561,7 +562,7 @@ try:
     data['root_dir'] = f"./{os.environ['PROJECT_NAME']}"
     data['global_vars']['venv'] = os.environ['VENV_PYTHON']
     # Construct eval_cmd for Agent usage
-    data['global_vars']['eval_cmd'] = f"{os.environ['VENV_PYTHON']} evaluator.py"
+    data['global_vars']['eval_cmd'] = os.environ.get('EVAL_CMD', f"{os.environ['VENV_PYTHON']} evaluator.py")
     
     # Plot names with fallback
     plot_out = os.environ.get('PLOT_OUTPUT', '')
