@@ -64,11 +64,11 @@ AgentCommander provides a high-level control plane for researchers to steer the 
 
 The **Auto-Setup Wizard** makes it easy to integrate AgentCommander into your existing workflow without rewriting your code.
 
-<video src="https://github.com/mx-Liu123/AgentCommander/raw/main/static/auto_setup_instrut_vedio.mp4" controls="controls" width="100%" muted="muted">
+<video src="https://raw.githubusercontent.com/mx-Liu123/AgentCommander/main/static/auto_setup_instrut_vedio.mp4" controls="controls" width="100%" muted="muted">
   Your browser does not support the video tag.
 </video>
 
-![Auto-Setup Wizard](docs/assets/images/auto_setup.png)
+![Auto-Setup Wizard](https://raw.githubusercontent.com/mx-Liu123/AgentCommander/main/docs/assets/images/auto_setup.png)
 
 1.  **[Case: You only have Dataset]**: Scaffolds a complete project (splitting, strategy, and evaluator) from raw data.
 2.  **[Case: You have Training Code]**: Instantly adapts your existing scripts into the agent system by adding a simple interface for weight loading and evaluation.

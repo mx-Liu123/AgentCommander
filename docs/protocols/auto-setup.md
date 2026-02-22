@@ -6,11 +6,11 @@ The Auto-Setup Wizard is the fastest way to initialize a robust, AgentCommander-
 
 The easiest way to start is using the built-in **Experiment Setup** wizard directly in the web UI.
 
-<video src="https://github.com/mx-Liu123/AgentCommander/raw/main/static/auto_setup_instrut_vedio.mp4" controls="controls" width="100%" muted="muted">
+<video src="https://raw.githubusercontent.com/mx-Liu123/AgentCommander/main/static/auto_setup_instrut_vedio.mp4" controls="controls" width="100%" muted="muted">
   Your browser does not support the video tag.
 </video>
 
-![Auto-Setup Wizard](../assets/images/auto_setup.png)
+![Auto-Setup Wizard](https://raw.githubusercontent.com/mx-Liu123/AgentCommander/main/docs/assets/images/auto_setup.png)
 
 1.  **Navigate to "Setup"**: Click the "Experiment Setup" tab in the UI sidebar.
 2.  **Select a Template**:
