@@ -10,9 +10,8 @@ MODEL_PRESETS = {
         'gemini-1.5-flash-latest'
     ],
     'qwen': [
-        'qwen:qwen-turbo', 
-        'qwen:qwen-plus', 
-        'qwen:qwen-max'
+        'qwen:coder-model',
+        'qwen:vision-model'
     ],
     'claude': [
         'claude-cli'
