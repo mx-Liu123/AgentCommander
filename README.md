@@ -64,9 +64,7 @@ AgentCommander provides a high-level control plane for researchers to steer the 
 
 The **Auto-Setup Wizard** makes it easy to integrate AgentCommander into your existing workflow without rewriting your code.
 
-<video src="https://raw.githubusercontent.com/mx-Liu123/AgentCommander/main/static/auto_setup_instrut_vedio.mp4" controls="controls" width="100%" muted="muted">
-  Your browser does not support the video tag.
-</video>
+[![AgentCommander Tutorial](https://img.youtube.com/vi/kOYtZffmd-I/maxresdefault.jpg)](https://youtu.be/kOYtZffmd-I)
 
 ![Auto-Setup Wizard](https://raw.githubusercontent.com/mx-Liu123/AgentCommander/main/docs/assets/images/auto_setup.png)
 
