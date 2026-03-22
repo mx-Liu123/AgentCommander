@@ -373,7 +373,7 @@
                 "session_id_input": "session_v1",
                 "session_id_output": "session_id",
                 "session_mode": "inherit",
-                "target_files": "strategy.py",
+                "target_files": "strategy.py, strategy_lib/",
                 "timeout": 600,
                 "user_template": "Hint from LLM supervisor:\n\uff08\u8fd9\u4e2a\u5efa\u8bae\u7ea7\u522b\u6bd4\u5176\u4ed6\u5efa\u8bae\u90fd\u8981\u9ad8\uff09\n{hint}\n\n{DEFAULT_SYS}\n\n[CRITICAL SAFETY WARNING]\nYou are STRICTLY FORBIDDEN from modifying any files outside the Current Working Directory. Any attempt to modify files in the outside will be detected and reverted immediately.\n\nHuman Instructions:\nstep1: Modify strategy code (*.py) to implement ur hypothesis. You are encouraged to add/remove print statements for intermediate variables to clarify the research process. But u should try to reduce the warnning output or repetitive output because they will distract u from important variables.\n\nNote that u not need to run code. I will run {eval_cmd} > eval_out.txt 2>&1; cat eval_out.txt later\n"
               },
@@ -432,7 +432,7 @@
                 "response_output": "correction_log",
                 "session_id_input": "session_v1",
                 "session_mode": "inherit",
-                "target_files": "strategy.py",
+                "target_files": "strategy.py, strategy_lib/",
                 "timeout": 600,
                 "user_template": "{DEFAULT_SYS}\n\nThe previous attempt failed to improve the metric.\nPicture: {plot_names}\nCurrent Metric: {current_metric}\nParent Metric: {parent_metric}\nCorrection Trial: {correction_trials}/5\n\nEvaluator Output:\n{test_output}\n\nTask:\nAnalyze the failure and the evaluator output.\nModify 'strategy.py' to fix the issue or try a different approach to improve the metric.\nEnsure the code is valid and runnable."
               },

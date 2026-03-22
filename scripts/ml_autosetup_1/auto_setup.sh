@@ -11,6 +11,7 @@
 #     {"id": "VENV_PYTHON", "label": "Python Interpreter Path (For splitting & config)", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python"},
 #     {"id": "EVAL_CMD", "label": "Evaluation Command (Check Python Path! Do not change 'evaluator.py')", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python evaluator.py", "tooltip": "Command to run the evaluator. Ensure the python path is correct."},
 #     {"id": "LLM_MODEL", "label": "LLM Model (for generation)", "type": "llm_selector", "options": ["__STANDARD_MODELS__"], "default": "auto-gemini-3"},
+#     {"id": "LLM_TIMEOUT", "label": "LLM Generation Time Limit (s)", "type": "number", "default": 300, "tooltip": "Max time allowed for AI to generate code. Default is 300s."},
 #     {"id": "RESERVED_RATIO", "label": "Reserved Data Ratio (0-1) [Hidden test set never seen by the Agent. Prevents strategy-level overfitting from frequent AI adjustments and ensures unbiased final evaluation]", "type": "number", "default": 0.05},
 #     {"id": "LOCK_PARENT", "label": "🔒 Lock Parent Directory (Read-Only during generation)", "type": "radio", "options": ["true", "false"], "default": "false"},
 #     {"id": "TEST_SET_RATIO", "label": "Test Set Ratio (0-1)", "type": "number", "default": 0.2},
@@ -196,6 +197,7 @@ get_input "VENV_PYTHON" "Python Interpreter Path" "$DEFAULT_VENV"
 
 DEFAULT_RESERVED=0.05
 get_input "RESERVED_RATIO" "Reserved Data Ratio (0-1)" "$DEFAULT_RESERVED"
+get_input "LLM_TIMEOUT" "LLM Generation Time Limit (s)" "300"
 
 echo -e "\n--- Evaluation Config ---"
 DEFAULT_TEST_RATIO=0.2
@@ -349,7 +351,7 @@ $EXTRA_INSTRUCTION"
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
         --whitelist "strategy.py,metric.py,plot.py" \
-        --timeout 300 \
+        --timeout "$LLM_TIMEOUT" \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
         $RESUME_FLAG
@@ -362,7 +364,7 @@ $EXTRA_INSTRUCTION"
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
         --whitelist "strategy.py,metric.py,plot.py" \
-        --timeout 300 \
+        --timeout "$LLM_TIMEOUT" \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
         --resume
@@ -375,7 +377,7 @@ $EXTRA_INSTRUCTION"
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
         --whitelist "strategy.py,metric.py,plot.py" \
-        --timeout 300 \
+        --timeout "$LLM_TIMEOUT" \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
         --resume
@@ -422,14 +424,12 @@ $EXTRA_INSTRUCTION"
         # Run a quick check using python -c. We assume evaluate returns a float (score) or raises error.
         # We use tee to show output in real-time while capturing it.
         "$VENV_PYTHON" -u -c "
-import sys
-try:
-    from evaluator import evaluate
-    print('Starting Dry Run...')
-    # We pass the strategy filename
-    score = evaluate('strategy.py')
-    print(f'Dry Run Success. Best metric: {score}')
-    # Check if plot was generated (evaluator usually prints something or we check file)
+        import sys
+        try:
+        from evaluator import evaluate
+        print('Starting Dry Run...')
+        score = evaluate()
+        print(f'Dry Run Success. Best metric: {score}')    # Check if plot was generated (evaluator usually prints something or we check file)
     import os
     if os.path.exists('best_result.png'):
         print('PLOT_GENERATED: best_result.png found.')

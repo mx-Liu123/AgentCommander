@@ -60,6 +60,11 @@ def main():
             no_exec_list=no_exec_list
         )
         
+        # DEBUG: Print the raw response
+        print("\n" + "="*40 + " [DEBUG: AI RESPONSE] " + "="*40)
+        print(response)
+        print("="*100 + "\n")
+        
         print("[LLM Runner] Task Completed.", flush=True)
     except Exception as e:
         print(f"[LLM Runner] Error: {e}", flush=True)

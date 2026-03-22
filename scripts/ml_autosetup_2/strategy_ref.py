@@ -1,145 +1,122 @@
-import os, sys, math, time, random, platform
+import os
+import sys
+import time
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+import pandas as pd
+from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import BaseCallback
 
-# ==========================================================
-# 1. STRATEGY CONFIGURATION (Optimizable)
-# ==========================================================
-# Training Seeds
-SEED = 42
-random.seed(SEED)
-np.random.seed(SEED)
-torch.manual_seed(SEED)
+# 路径对齐：确保能够加载 strategy_lib/ 文件夹下的依赖
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
+sys.path.append(os.path.join(current_dir, "strategy_lib"))
 
-# Hyperparameters (Agent can modify these freely)
-HPARAMS = {
-    "d_model": 128,
-    "depth": 6,
-    "heads": 4,
-    "d_ff": 512,
-    "ds_stride": 2,
-    "p_drop": 0.05,
-    "lr": 8e-4,
-    "batch_size": 128,
-    "epochs": 10
-}
+from strategy_lib.env import NautilusEnv
+from strategy_lib.visualizer import TradingVisualizer
 
-# ==========================================================
-# 2. DATA LOADING (Protocol - DO NOT MODIFY)
-# ==========================================================
-from experiment_setup import load_and_split_data
+class EvalAndSaveCallbackEOD(BaseCallback):
+    def __init__(self, eval_env, total_steps, steps_per_ep):
+        super(EvalAndSaveCallbackEOD, self).__init__(0)
+        self.eval_env = eval_env
+        self.total_steps = total_steps
+        self.steps_per_ep = steps_per_ep
+        self.episode_count = 0
+        self.best_det_profit = -999.0 
+        self.current_f_scale = -1.0 # 追踪当前等级
+        self.found_positive_in_scale = False # 标记当前等级是否已攻克
+        self.start_time = time.time()
+        self.model_save_path = "models/best_model_eod"
+        self.log_file = "train_debug_eod.log"
 
-# ==========================================================
-# 3. MODEL DEFINITION (Agent can redefine freely)
-# ==========================================================
-class PhaseTransformerRealisationFast(nn.Module):
-    def __init__(self, P, L, d_model, depth, heads, d_ff, p_drop, ds_stride):
-        super().__init__()
-        # Simple Transformer-like structure for reference
-        self.embedding = nn.Linear(L, d_model)
-        self.encoder = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model, heads, d_ff, p_drop, batch_first=True),
-            num_layers=depth
-        )
-        self.fc_out = nn.Linear(d_model, L * 2) # Output cos/sin
-        self.P = P
-        self.L = L
-
-    def forward(self, x):
-        # x: (B, P, L) -> flatten -> (B, P*L) ? No, let's treat as sequence of length P?
-        # This is just a dummy reference implementation
-        B, P, L = x.shape
-        x_emb = self.embedding(x) # (B, P, d_model)
-        x_enc = self.encoder(x_emb)
-        out = self.fc_out(x_enc) # (B, P, L*2)
-        # Reshape to (B, L, 2) ? Usually output is phase map.
-        # Let's assume output is (B, L, 2) unit vector
-        return out.mean(dim=1).view(B, L, 2)
-
-# ==========================================================
-# 4. EXPORT INTERFACE (Required for Evaluator)
-# ==========================================================
-def load_trained_model(path, device):
-    """
-    Factory function for Evaluator to load the model without knowing class details.
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Model file not found: {path}")
+    def _on_step(self) -> bool:
+        total_episodes = max(self.total_steps / self.steps_per_ep, 4)
+        current_ep = self.num_timesteps / self.steps_per_ep
         
-    checkpoint = torch.load(path, map_location=device)
-    
-    # Load Config from checkpoint (Best Practice for Evolution)
-    # If not present, fallback to current global HPARAMS
-    config = checkpoint.get('config', HPARAMS) 
-    
-    # Instantiate Model with saved config
-    # Note: P and L usually come from data, but here we might need to know them.
-    # We can save them in config too, or assume fixed.
-    P = config.get('P', 2)
-    L = config.get('L', 1000)
-    
-    model = PhaseTransformerRealisationFast(
-        P, L, 
-        d_model=config.get('d_model', 128),
-        depth=config.get('depth', 6),
-        heads=config.get('heads', 4),
-        d_ff=config.get('d_ff', 512),
-        p_drop=config.get('p_drop', 0.05),
-        ds_stride=config.get('ds_stride', 2)
-    )
-    
-    # Load Weights
-    sd = checkpoint['model_state_dict']
-    # Handle torch.compile prefix if present
-    sd = {k.replace("_orig_mod.", ""): v for k, v in sd.items()}
-    model.load_state_dict(sd)
-    model.to(device)
-    model.eval()
-    
-    return model
-
-# ==========================================================
-# 5. TRAINING EXECUTION
-# ==========================================================
-def run_training():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # Load Data
-    X_tr, X_va, phi_tr, phi_va = load_and_split_data()
-    P, R, L = X_tr.shape
-    
-    # Update HPARAMS with data shape
-    HPARAMS['P'] = P
-    HPARAMS['L'] = L
-    
-    # Instantiate
-    model = PhaseTransformerRealisationFast(
-        P, L, HPARAMS['d_model'], HPARAMS['depth'], HPARAMS['heads'], 
-        HPARAMS['d_ff'], HPARAMS['p_drop'], HPARAMS['ds_stride']
-    ).to(device)
-    
-    optimizer = torch.optim.AdamW(model.parameters(), lr=HPARAMS['lr'])
-    criterion = nn.MSELoss()
-    
-    print("Starting training...")
-    # Dummy Training Loop
-    model.train()
-    for epoch in range(1, 3): # Just 2 epochs for ref check
-        # ... (Real training logic goes here) ...
-        print(f"Epoch {epoch} complete.")
+        # 动态比例切换 (保证每个阶段至少有 1 个 ep)
+        if current_ep < (total_episodes * 0.3): f_scale = 0.0
+        elif current_ep < (total_episodes * 0.6): f_scale = 0.2
+        elif current_ep < (total_episodes * 0.8): f_scale = 0.5
+        else: f_scale = 1.0
         
-    # Save Model + Config
-    save_path = "best_fast.pt"
-    torch.save({
-        "model_state_dict": model.state_dict(),
-        "config": HPARAMS, # Save current config!
-        "mu_x": torch.zeros(1), # Dummy stats
-        "std_x": torch.ones(1)
-    }, save_path)
-    print(f"Model saved to {save_path}")
+        # 检测等级切换
+        if f_scale > self.current_f_scale:
+            self.current_f_scale = f_scale
+            self.found_positive_in_scale = False
+            print(f"\n>>> [LEVEL UP] Friction Scale increased to {f_scale}. Resetting local baseline...")
+
+        self.training_env.set_attr("friction_scale", f_scale)
+        self.model.ent_coef = max(0.1 - (self.num_timesteps/self.total_steps) * 0.09, 0.01)
+
+        if "dones" in self.locals and self.locals["dones"][0]:
+            self.episode_count += 1
+            self.eval_env.friction_scale = self.current_f_scale # 同步评估等级
+            det_profit, det_trades = self._run_deterministic_eval()
+            
+            should_save = False
+            status = " [KEEP]"
+            
+            if det_profit > 0:
+                if not self.found_positive_in_scale:
+                    # 规则 A：当前等级首次出现正收益，无视旧数值，强制设为新基准
+                    should_save = True
+                    self.found_positive_in_scale = True
+                    status = " [NEW SCALE WINNER]"
+                elif det_profit > self.best_det_profit:
+                    # 规则 B：在当前已攻克的等级中，寻找更优解
+                    should_save = True
+                    status = " [AUDIT BEST SAVED]"
+            else:
+                # 规则 C：如果当前等级全是负收益，则只在比历史最高（可能来自旧等级）还好时才更新
+                if not self.found_positive_in_scale and det_profit > self.best_det_profit:
+                    should_save = True
+                    status = " [BEST NEGATIVE]"
+
+            if should_save:
+                self.best_det_profit = det_profit
+                self.model.save(self.model_save_path)
+            
+            msg = f">>> EOD_EP {self.episode_count:02d} | Det Audit: {det_profit:+.2f}% ({det_trades} trades) | Fric: {f_scale:.1f}{status}"
+            print(msg)
+            with open(self.log_file, "a") as f: f.write(msg + "\n")
+        return True
+
+    def _run_deterministic_eval(self):
+        obs, _ = self.eval_env.reset()
+        done = False
+        while not done:
+            action, _ = self.model.predict(obs, deterministic=True)
+            obs, reward, done, _, info = self.eval_env.step(action)
+        return (info.get('equity', 1e6)-1e6)/1e4, info.get('trades', 0)
+
+def run_eod_evolution():
+    print(f"=== [Nautilus PORTABLE EOD RUNNER] ===\n")
+    # 灵活配置 Episode 数量，保底 4 个
+    n_eps = int(os.environ.get("TOTAL_EPISODES", 4))
+    n_eps = max(n_eps, 4)
+    
+    env = NautilusEnv()
+    eval_env = NautilusEnv()
+    total_steps = env.total_data_steps * n_eps
+    print(f"Starting Curriculum Learning with {n_eps} episodes ({total_steps} total steps)...")
+    
+    model = PPO("MlpPolicy", env, verbose=0, n_steps=4096, device="cpu")
+    callback = EvalAndSaveCallbackEOD(eval_env, total_steps, env.total_data_steps)
+    model.learn(total_timesteps=total_steps, callback=callback)
+    
+    print("Generating EOD Audit Plots...")
+    best_model = PPO.load("models/best_model_eod.zip")
+    obs, _ = eval_env.reset()
+    done, history = False, []
+    while not done:
+        action, _ = best_model.predict(obs, deterministic=True)
+        obs, reward, done, _, info = eval_env.step(action)
+        mid_price = (eval_env._ask_series[eval_env.current_step-1] + eval_env._bid_series[eval_env.current_step-1])/2.0
+        history.append({'timestamp': info['timestamp'], 'price': float(mid_price), 'equity': info['equity'], 'position': info['position'], 'action': int(action)})
+    TradingVisualizer.plot_daily_results(pd.DataFrame(history), base_dir="plots_eod")
+    
+    # 关键：为 AgentCommander 打印标准化指标
+    print(f"\nFinal Audit Complete.")
+    print(f"Best metric: {callback.best_det_profit:.6f}")
 
 if __name__ == "__main__":
-    run_training()
+    run_eod_evolution()

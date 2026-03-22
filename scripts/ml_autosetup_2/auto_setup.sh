@@ -2,37 +2,41 @@
 
 # <GEMINI_UI_CONFIG>
 # {
-#   "name": "[Case: You have Training Code] ML Auto-Setup",
-#   "description": "Adapt your existing ML training script to the Agent framework. Requires your script to save model weights (e.g. .pt) for independent evaluation.",
+#   "name": "[Scenario 2] Bring Your Own Training Code",
+#   "description": "Adapt your existing training script. The Agent will analyze your code to find data sources and optimize it based on your instructions.",
 #   "inputs": [
-#     {"id": "TARGET_ROOT_DIR", "label": "Target Root Directory (Where to create project)", "type": "text", "default": ".", "tooltip": "'.' = AgentCommander Root. Use absolute path for others."},
+#     {"id": "TARGET_ROOT_DIR", "label": "Target Root Directory (Where to create project)", "type": "text", "default": ".", "tooltip": "'.' = AgentCommander Root."},
 #     {"id": "PROJECT_NAME", "label": "Project Name (e.g., my_new_experiment)", "type": "text", "default": "my_new_experiment", "tooltip": "Folder name to create"},
-#     {"id": "DATA_DIR", "label": "Data Directory (Absolute path, must contain X.npy and Y.npy)", "type": "text", "default": "~/test_data/", "tooltip": "Absolute path containing X.npy and Y.npy"},
+#     {"id": "TASK_TYPE", "label": "Task Type", "type": "select", "options": ["Standard (Regression/Classification)", "Reinforcement Learning"], "default": "Standard (Regression/Classification)"},
+#     {"id": "REFERENCE_STRATEGY_FILE_PATH", "label": "Original Strategy File Path (.py)", "type": "text", "default": "your_code/strategy.py", "tooltip": "Absolute path to your existing .py training script."},
+#     {"id": "STRATEGY_DIR", "label": "Strategy Dependency Folder (Optional)", "type": "text", "default": "", "tooltip": "Folder containing helper scripts or environment files. Agent can modify files here."},
+#     {"id": "DATA_PROTOCOL_DESC", "label": "Data & Splitting Instructions (Natural Language)", "type": "textarea", "default": "Find the data source in the strategy file. Use 80% for training and 20% for testing.", "rows": 3},
 #     {"id": "VENV_PYTHON", "label": "Python Interpreter Path (For splitting & config)", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python"},
 #     {"id": "EVAL_CMD", "label": "Evaluation Command", "type": "text", "default": "/home/liumx/.conda/envs/agent_commander/bin/python strategy.py && /home/liumx/.conda/envs/agent_commander/bin/python evaluator.py", "tooltip": "Command to run training then evaluation. Sequential execution is required."},
 #     {"id": "LLM_MODEL", "label": "LLM Model (for generation)", "type": "llm_selector", "options": ["__STANDARD_MODELS__"], "default": "auto-gemini-3"},
-    {"id": "LOCK_PARENT", "label": "🔒 Lock Parent Directory (Read-Only during generation)", "type": "radio", "options": ["true", "false"], "default": "false"},
-    {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s) [Per Eval: No new searches start after this, but current trial finishes]", "type": "number", "default": 600},
-    {"id": "HARD_LIMIT", "label": "Hard Time Limit (s) [Per Eval: Kill immediately if exceeded, mark as Failure]", "type": "number", "default": 900},
-    {"id": "USER_SEED", "label": "Random Seed (Number or 'random')", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
-    {"id": "METRIC_TEXT", "label": "Metric Description (Defines calculate_score. System auto-converts to 'Lower is Better' e.g. via negative sign)", "type": "textarea", "default": "MSE", "rows": 2},
-    {"id": "TASK_BG_TEXT", "label": "Task Background (Optional, e.g. LSTM/CNN for 3D/4D data)", "type": "textarea", "default": "GW PTA wave to phase", "rows": 2},
-    {"id": "MODEL_HINT_TEXT", "label": "Model/Strategy Hint (Optional)", "type": "textarea", "default": "with cnn+LSTM?", "rows": 2}
-  ],
-  "preview_steps": [
-    "1. Environment Check & Confirmation",
-    "2. Create Directory Structure",
-    "3. AI Adaptation (Strategy, Evaluator, Metric, Plot).",
-    "4. Validation (Sequential Train -> Eval)",
-    "5. Update config.json"
-  ],
-  "system_intro": [
-    "PROTOCOL & ARCHITECTURE:",
-    "• experiment_setup.py: IMMUTABLE data protocol. Ensures Strategy and Evaluator use identical splits.",
-    "• strategy.py (PLAYER): Your training code. Must save weights and implement load_trained_model() for Evaluator.",
-    "• evaluator.py (JUDGE): Loads weights from Strategy and runs standardized evaluation. Includes Anti-Cheating check.",
-    "• metric.py & plot.py: Automated score and visualization logic. Read-Only during iteration loop."
-  ]
+#     {"id": "LLM_TIMEOUT", "label": "LLM Generation Time Limit (s)", "type": "number", "default": 300, "tooltip": "Max time allowed for AI to generate code. Default is 300s."},
+#     {"id": "LOCK_PARENT", "label": "🔒 Lock Parent Directory (Read-Only during generation)", "type": "radio", "options": ["true", "false"], "default": "false"},
+#     {"id": "SOFT_LIMIT", "label": "Soft Time Limit (s) [Per Eval: No new searches start after this, but current trial finishes]", "type": "number", "default": 600},
+#     {"id": "HARD_LIMIT", "label": "Hard Time Limit (s) [Per Eval: Kill immediately if exceeded, mark as Failure]", "type": "number", "default": 900},
+#     {"id": "USER_SEED", "label": "Random Seed (Number or 'random')", "type": "text", "default": "42", "tooltip": "Enter a number or 'random'"},
+#     {"id": "METRIC_TEXT", "label": "Metric Description (Defines calculate_score. System auto-converts to 'Lower is Better' e.g. via negative sign)", "type": "textarea", "default": "MSE", "rows": 2},
+#     {"id": "TASK_BG_TEXT", "label": "Task Background (Optional, e.g. LSTM/CNN for 3D/4D data)", "type": "textarea", "default": "GW PTA wave to phase", "rows": 2},
+#     {"id": "MODEL_HINT_TEXT", "label": "Model/Strategy Hint (Optional)", "type": "textarea", "default": "with cnn+LSTM?", "rows": 2}
+#   ],
+#   "preview_steps": [
+#     "1. Environment Check & Confirmation",
+#     "2. Create Directory Structure",
+#     "3. AI Adaptation (Strategy, Evaluator, Metric, Plot).",
+#     "4. Validation (Sequential Train -> Eval)",
+#     "5. Update config.json"
+#   ],
+#   "system_intro": [
+#     "PROTOCOL & ARCHITECTURE:",
+#     "• experiment_setup.py: IMMUTABLE data protocol. Ensures Strategy and Evaluator use identical splits.",
+#     "• strategy.py (PLAYER): Your training code. Must save weights and implement load_trained_model() for Evaluator.",
+#     "• evaluator.py (JUDGE): Loads weights from Strategy and runs standardized evaluation. Includes Anti-Cheating check.",
+#     "• metric.py & plot.py: Automated score and visualization logic. Read-Only during iteration loop."
+#   ]
 # }
 # </GEMINI_UI_CONFIG>
 
@@ -45,16 +49,7 @@ PLOT_SCRIPT="$SCRIPT_DIR/plot.py"
 
 # Reference Files
 STRATEGY_REF="$SCRIPT_DIR/strategy_ref.py"
-EVALUATOR_REF="$SCRIPT_DIR/evaluator_ref.py"
 EXP_SETUP_SCRIPT="$SCRIPT_DIR/experiment_setup.py"
-
-# Check if source files exist
-for file in "$EVALUATOR_SCRIPT" "$STRATEGY_SCRIPT" "$METRIC_SCRIPT" "$PLOT_SCRIPT" "$STRATEGY_REF" "$EVALUATOR_REF" "$EXP_SETUP_SCRIPT"; do
-    if [ ! -f "$file" ]; then
-        echo "Error: Source file not found: $file"
-        exit 1
-    fi
-done
 
 echo "=== ML Project Auto-Setup Wizard ==="
 echo "Date: $(date)"
@@ -154,70 +149,59 @@ if [ -n "$TARGET_ROOT_DIR" ]; then
 fi
 
 get_input "PROJECT_NAME" "[REQUIRED] Project Name (e.g., my_new_experiment)" ""
+get_input "TASK_TYPE" "Task Type" "Standard (Regression/Classification)"
+get_input "LLM_TIMEOUT" "LLM Generation Time Limit (s)" "300"
+get_input "REFERENCE_STRATEGY_FILE_PATH" "Original Strategy File Path (.py)" ""
+get_input "STRATEGY_DIR" "Strategy Dependency Folder" ""
+get_input "DATA_PROTOCOL_DESC" "Data Handling Instructions" ""
 
-# Special handling for DATA_DIR validation
-if [ -z "$DATA_DIR" ]; then
-    while true; do
-        echo -e "\n[REQUIRED] Enter the ABSOLUTE path to the Data Directory."
-        read -p "Data Directory (must contain X.npy and Y.npy): " DATA_DIR
-        # Validation Logic...
-        if [[ "$DATA_DIR" == "~"* ]]; then DATA_DIR="${DATA_DIR/#\~/$HOME}"; fi
-        if [[ "$DATA_DIR" == ~* ]]; then DATA_DIR="${DATA_DIR/#\~/$HOME}"; fi
-        DATA_DIR=$(realpath "$DATA_DIR" 2>/dev/null)
-        
-        if [ -z "$DATA_DIR" ] || [ ! -d "$DATA_DIR" ]; then
-            echo "Error: Invalid path: $DATA_DIR"
-            DATA_DIR="" # Reset to loop
-            continue
-        fi
-        if [ ! -f "$DATA_DIR/X.npy" ] || [ ! -f "$DATA_DIR/Y.npy" ]; then
-            echo "Error: Missing X.npy or Y.npy in $DATA_DIR"
-            DATA_DIR=""
-            continue
-        fi
-        break
-    done
+# Set Reference Templates based on Task Type
+if [[ "$TASK_TYPE" == *"Reinforcement"* ]]; then
+    EVALUATOR_REF="$SCRIPT_DIR/evaluator_rl_ref.py"
+    METRIC_REF="$SCRIPT_DIR/metric_rl_ref.py"
+    PLOT_REF="$SCRIPT_DIR/plot_rl_ref.py"
+    echo "Task Type: Reinforcement Learning detected. Using RL Templates."
 else
-    # Env Var set, validate it once
-    echo "Data Directory: $DATA_DIR (Loaded from Env)"
-    if [[ "$DATA_DIR" == "~"* ]]; then DATA_DIR="${DATA_DIR/#\~/$HOME}"; fi
-    DATA_DIR=$(realpath "$DATA_DIR" 2>/dev/null)
-    if [ ! -d "$DATA_DIR" ] || [ ! -f "$DATA_DIR/X.npy" ]; then
-        echo "❌ Error: Invalid DATA_DIR from environment: $DATA_DIR"
+    EVALUATOR_REF="$SCRIPT_DIR/evaluator_std_ref.py"
+    METRIC_REF="$SCRIPT_DIR/metric_std_ref.py"
+    PLOT_REF="$SCRIPT_DIR/plot_std_ref.py"
+    echo "Task Type: Standard ML detected. Using Standard Templates."
+fi
+
+# Check if source files exist
+for file in "$EVALUATOR_REF" "$METRIC_REF" "$PLOT_REF" "$STRATEGY_SCRIPT" "$STRATEGY_REF" "$EXP_SETUP_SCRIPT"; do
+    if [ ! -f "$file" ]; then
+        echo "Error: Source file not found: $file"
         exit 1
     fi
+done
+
+# Validation for Strategy Dependency Folder
+if [ -n "$STRATEGY_DIR" ]; then
+    if [[ "$STRATEGY_DIR" == "~"* ]]; then STRATEGY_DIR="${STRATEGY_DIR/#\~/$HOME}"; fi
+    if [ ! -d "$STRATEGY_DIR" ]; then
+        echo "❌ Error: Strategy dependency folder not found: $STRATEGY_DIR"
+        exit 1
+    fi
+    echo "Using strategy dependencies from: $STRATEGY_DIR"
+fi
+
+# Validation for Original Strategy File
+if [ -n "$REFERENCE_STRATEGY_FILE_PATH" ]; then
+    if [[ "$REFERENCE_STRATEGY_FILE_PATH" == "~"* ]]; then REFERENCE_STRATEGY_FILE_PATH="${REFERENCE_STRATEGY_FILE_PATH/#\~/$HOME}"; fi
+    if [ ! -f "$REFERENCE_STRATEGY_FILE_PATH" ]; then
+        echo "❌ Error: Original strategy file not found: $REFERENCE_STRATEGY_FILE_PATH"
+        exit 1
+    fi
+    echo "Using source code from: $REFERENCE_STRATEGY_FILE_PATH"
+    # Overwrite the template's strategy_ref with user's code
+    cp "$REFERENCE_STRATEGY_FILE_PATH" "$STRATEGY_REF"
 fi
 
 DEFAULT_VENV="/home/$USER/.conda/envs/agent_commander/bin/python"
 get_input "VENV_PYTHON" "Python Interpreter Path" "$DEFAULT_VENV"
 
-echo -e "\n--- Evaluation Config ---"
-
-DEFAULT_SOFT=600
-get_input "SOFT_LIMIT" "Soft Time Limit (seconds)" "$DEFAULT_SOFT"
-
-DEFAULT_HARD=900
-get_input "HARD_LIMIT" "Hard Time Limit (seconds)" "$DEFAULT_HARD"
-
-# Random Seed Logic
-DEFAULT_SEED=42
-if [ -z "$USER_SEED" ]; then
-    read -p "Random Seed (Press Enter for $DEFAULT_SEED, or type 'random' for random): " USER_SEED
-fi
-if [ "$USER_SEED" == "random" ]; then
-    RANDOM_SEED=$RANDOM
-    echo "Using generated random seed: $RANDOM_SEED"
-else
-    RANDOM_SEED=${USER_SEED:-$DEFAULT_SEED}
-    echo "Random Seed: $RANDOM_SEED"
-fi
-
-echo -e "\n--- AI Instructions ---"
-get_input "METRIC_TEXT" "[REQUIRED] Metric Description" ""
-
-echo -e "\nTip: Task Background..."
-get_input "TASK_BG_TEXT" "Task Background (Optional)" ""
-get_input "MODEL_HINT_TEXT" "Model/Strategy Hint (Optional)" ""
+# ... (omitted evaluation config)
 
 # ==============================================================================
 # 3. Directory Structure & File Copying
@@ -228,35 +212,56 @@ PROJECT_ROOT="./$PROJECT_NAME"
 
 # Check if project directory already exists
 if [ -d "$PROJECT_ROOT" ]; then
-    echo "❌ Error: Project directory '$PROJECT_ROOT' already exists!"
-    echo "Please chose a different project name or delete the existing directory."
+    FULL_PATH=$(realpath "$PROJECT_ROOT")
+    echo "❌ Error: Project directory '$PROJECT_ROOT' already exists at: $FULL_PATH"
+    echo "Please choose a different project name or delete the existing directory."
     exit 1
 fi
 
 EXP_DIR="$PROJECT_ROOT/Branch_example/exp_example"
 
-mkdir -p "$EXP_DIR/data" # Create data dir placeholder, though we use absolute path
-cp "$EVALUATOR_SCRIPT" "$STRATEGY_SCRIPT" "$METRIC_SCRIPT" "$PLOT_SCRIPT" "$EXP_DIR/"
+mkdir -p "$EXP_DIR/data" 
+if [ -n "$STRATEGY_DIR" ]; then
+    echo "[Setup] Copying strategy dependencies to $EXP_DIR/strategy_lib..."
+    mkdir -p "$EXP_DIR/strategy_lib"
+    cp -r "$STRATEGY_DIR"/* "$EXP_DIR/strategy_lib/"
+fi
+
+cp "$STRATEGY_SCRIPT" "$EXP_DIR/"
+# Copy dynamically selected Evaluator, Metric, and Plot
+cp "$EVALUATOR_REF" "$EXP_DIR/evaluator.py"
+cp "$METRIC_REF" "$EXP_DIR/metric.py"
+cp "$PLOT_REF" "$EXP_DIR/plot.py"
 # Copy Reference & Setup files
 cp "$STRATEGY_REF" "$EVALUATOR_REF" "$EXP_SETUP_SCRIPT" "$EXP_DIR/"
 
 echo "[Setup] Files copied to $EXP_DIR"
 
 # ==============================================================================
-# 5. Configure Experiment Setup (sed)
+# 4. Data Protocol Generation (AI Driven)
+# ==============================================================================
+
+echo -e "\n[Step 4] AI Analyzing data sources and generating protocol..."
+
+printf "Task: Analyze '$EXP_DIR/strategy_ref.py' to find where it loads data from (e.g., file paths, numpy arrays). \
+Now, implement 'load_and_split_data()' in '$EXP_DIR/experiment_setup.py'. \
+Instruction from user: $DATA_PROTOCOL_DESC. \
+Contract: The function must return (X_train, X_test, y_train, y_test) or appropriate RL equivalents. \
+IMPORTANT: Hardcode any discovered absolute paths into the generated code to ensure portability." | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
+    --model "$LLM_MODEL" \
+    --cwd "$EXP_DIR" \
+    --whitelist "strategy.py,metric.py,plot.py,strategy_lib/,experiment_setup.py" \
+    --timeout "$LLM_TIMEOUT"
+
+# ==============================================================================
+# 5. Configure Evaluator (Random Seed only)
 # ==============================================================================
 
 TARGET_SETUP="$EXP_DIR/experiment_setup.py"
-echo "[Config] Injecting settings into $TARGET_SETUP..."
-
-# 1. Update DATA_PATH
-# We append a slash to ensure it's treated as a directory
-sed -i "s|^DATA_PATH = .*|DATA_PATH = \"$DATA_DIR/\"|" "$TARGET_SETUP"
-
-# 2. Update Random Seed
+# Update Random Seed
 sed -i "s/^PROTOCOL_SEED = .*/PROTOCOL_SEED = $RANDOM_SEED/" "$TARGET_SETUP"
 
-echo "Experiment Setup configured."
+echo "Experiment Setup initialized."
 
 # ==============================================================================
 # 6. AI Generation Loop
@@ -277,10 +282,18 @@ while true; do
     # Restrict execution of key files during generation
     NO_EXEC_FLAG="--no-exec evaluator.py,strategy.py"
 
-    # --- Reset to Reference Templates ---
-    # We use the _ref files as the baseline for AI modification
+    # --- Reset Core Files (Task-Specific) ---
     cp "$STRATEGY_REF" "$EXP_DIR/strategy.py"
     cp "$EVALUATOR_REF" "$EXP_DIR/evaluator.py"
+    cp "$METRIC_REF" "$EXP_DIR/metric.py"
+    cp "$PLOT_REF" "$EXP_DIR/plot.py"
+    
+    # Robust Variable Injection for experiment_setup.py
+    TARGET_SETUP="$EXP_DIR/experiment_setup.py"
+    FINAL_SEED=${RANDOM_SEED:-42}
+    if grep -q "PROTOCOL_SEED =" "$TARGET_SETUP"; then
+        sed -i "s/^PROTOCOL_SEED = .*/PROTOCOL_SEED = $FINAL_SEED/" "$TARGET_SETUP"
+    fi
     
     # --- Step 5: Strategy Generation ---
     echo "[LLM] Generating Strategy (Attempt $((RETRY_COUNT+1)))..."
@@ -292,69 +305,80 @@ while true; do
         RESUME_FLAG="--resume"
         if [ -n "$LAST_ERROR_LOG" ]; then
             EXTRA_INSTRUCTION="PREVIOUS ATTEMPT FAILED. Error Log:\n$LAST_ERROR_LOG\n\nFix the code based on this error."
+            echo -e "\n" + "#"*40 + " [DEBUG: FEEDBACK TO AI] " + "#"*40
+            echo -e "$EXTRA_INSTRUCTION"
+            echo -e "#"*100 + "\n"
         fi
     fi
 
+    # Tailor Prompt based on Task Type
+    if [[ "$TASK_TYPE" == *"Reinforcement"* ]]; then
+        RL_DATA_RESTRICTION="**SPECIAL RL RULE**: The data loading logic in 'strategy_lib/env.py' is already correctly configured with absolute paths. Do NOT attempt to replace it with 'experiment_setup.py' logic. Focus only on implementing the mandatory strategy interfaces."
+    else
+        RL_DATA_RESTRICTION="1. DATA: Replace original data loading with 'from experiment_setup import load_and_split_data' to align with the framework protocol."
+    fi
+
     PROMPT_STRATEGY="Target: $EXP_DIR/strategy.py. Task Background: $TASK_BG_TEXT. Model Hints: $MODEL_HINT_TEXT. \
-GOAL: Adapt this user-provided script to our Agent Framework with MINIMAL changes. \
+GOAL: Adapt this user-provided script to our Agent Framework with **EXTREMELY MINIMAL** changes. Do NOT refactor the core logic unless absolutely necessary for the script to run. \
 REQUIREMENTS: \
-1. DATA: Replace original data loading with 'from experiment_setup import load_and_split_data'. \
-2. INTERFACE: Implement 'def load_trained_model(path, device):' (See strategy_ref.py). This MUST return a loaded model instance for evaluation. \
-3. EXECUTION: Ensure 'if __name__ == \"__main__\":' runs training and saves the model to 'best_fast.pt'. \
-4. IMPORTANT: Do NOT try to run the code yourself. The system will run it for you after you finish editing. \
+$RL_DATA_RESTRICTION \
+2. INTERFACE: Implement 'def load_trained_model(path, device):' (refer to strategy_ref.py for the signature). This is ONLY for model weight loading. \
+3. EXECUTION: Ensure the training process saves the model to 'best_fast.pt' (or appropriate format) and can be triggered by 'if __name__ == \"__main__\":'. \
+4. CONTEXT: If a 'strategy_lib' directory exists, it contains helper files. You may make minor adjustments there ONLY if they are required to support the interfaces above. \
+5. CRITICAL: Preserve the original model architecture and training hyperparameters as much as possible. Adaptation is the priority, not optimization at this stage. \
+6. MANDATORY: The functions 'load_trained_model' and the 'if __name__ == \"__main__\":' training block are **MANDATORY**. Do NOT remove them to fix run errors. If you encounter errors, fix the underlying environment or data logic instead. \
+7. IMPORTANT: Do NOT try to run the code yourself. The system will run it for you after you finish editing. \
 $EXTRA_INSTRUCTION"
     
+    # Define consistent whitelist for all steps
+    GLOBAL_WHITELIST="strategy.py,metric.py,plot.py,strategy_lib/,experiment_setup.py"
+
     printf "%b" "$PROMPT_STRATEGY" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
-        --whitelist "strategy.py,metric.py,plot.py" \
-        --timeout 300 \
+        --whitelist "$GLOBAL_WHITELIST" \
+        --timeout "$LLM_TIMEOUT" \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
         $RESUME_FLAG
 
-    # --- Step 5.5: Evaluator Adaptation ---
-    echo "[LLM] Adapting Evaluator..."
-    PROMPT_EVAL="Target: $EXP_DIR/evaluator.py. Reference: $EXP_DIR/evaluator_ref.py. \
-GOAL: Adapt the evaluator to test the model trained by strategy.py. \
-REQUIREMENTS: \
-1. Use 'from strategy import load_trained_model'. \
-2. Use 'from experiment_setup import load_and_split_data, get_validation_noise_generator'. \
-3. Load 'best_fast.pt' using the factory function. \
-4. Perform inference and print 'Best metric: X.XXXX'. \
-5. Do NOT try to run the code yourself."
-
-    printf "%b" "$PROMPT_EVAL" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
-        --model "$LLM_MODEL" \
-        --cwd "$EXP_DIR" \
-        --whitelist "evaluator.py,metric.py,plot.py" \
-        --timeout 300 \
-        $LOCK_FLAG \
-        $NO_EXEC_FLAG \
-        --resume
+    # --- Step 5.5: Evaluator Adaptation (DEPRECATED: We use standardized engine) ---
+    echo "[Info] Using standardized Evaluator Engine. No adaptation needed."
 
     # --- Step 6: Metric Generation ---
-    echo "[LLM] Generating Metric..."
-    PROMPT_METRIC="Hint: $METRIC_TEXT. Now modify $EXP_DIR/metric.py. Ensure calculate_score(y_true, y_pred) handles the shapes produced by strategy.py."
+    echo "[LLM] Generating Metric logic..."
+    if [[ "$TASK_TYPE" == *"Reinforcement"* ]]; then
+        PROMPT_METRIC="Goal: Implement 'calculate_rl_score(history)' in $EXP_DIR/metric.py. \
+        Hint: $METRIC_TEXT. History is a list of dicts from env.step info. Return a scalar float (higher is usually better)."
+    else
+        PROMPT_METRIC="Goal: Implement 'calculate_standard_score(y_true, y_pred)' in $EXP_DIR/metric.py. \
+        Hint: $METRIC_TEXT. Use numpy. Return a scalar float (MSE, Accuracy, etc.)."
+    fi
     
     printf "%b" "$PROMPT_METRIC" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
-        --whitelist "metric.py,plot.py" \
-        --timeout 300 \
+        --whitelist "$GLOBAL_WHITELIST" \
+        --timeout "$LLM_TIMEOUT" \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
         --resume
     
-    # --- Step 7: Plot Generation (New) ---
-    echo "[LLM] Generating Plot Visualization..."
-    PROMPT_PLOT="Modify $EXP_DIR/plot.py. Task: $TASK_BG_TEXT. Metric: $METRIC_TEXT. Requirements: 1. Draw ONE plot (e.g. Pred vs True). 2. Save as 'best_result.png'. 3. Function signature: 'draw_plots(X_test, y_test, y_pred, output_dir, params)'."
+    # --- Step 7: Plot Generation ---
+    echo "[LLM] Generating Plot visualization..."
+    if [[ "$TASK_TYPE" == *"Reinforcement"* ]]; then
+        PROMPT_PLOT="Goal: Implement 'draw_rl_plots(history, output_dir)' in $EXP_DIR/plot.py. \
+        Task Background: $TASK_BG_TEXT. Draw a professional plot (e.g., Equity Curve) and save as 'best_result.png'."
+    else
+        PROMPT_PLOT="Goal: Implement 'draw_standard_plots(X, y_true, y_pred, output_dir)' in $EXP_DIR/plot.py. \
+        Task Background: $TASK_BG_TEXT. Draw a professional plot (e.g., Pred vs True) and save as 'best_result.png'."
+    fi
     
     printf "%b" "$PROMPT_PLOT" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
         --model "$LLM_MODEL" \
         --cwd "$EXP_DIR" \
-        --whitelist "plot.py" \
-        --timeout 300 \
+        --whitelist "$GLOBAL_WHITELIST" \
+        --timeout "$LLM_TIMEOUT" \
         $LOCK_FLAG \
         $NO_EXEC_FLAG \
         --resume
@@ -368,18 +392,44 @@ REQUIREMENTS: \
 
     # 7. Check Strategy Interface
     if ! grep -q "def load_trained_model" "$EXP_DIR/strategy.py"; then
-        echo "❌ ERROR: strategy.py is missing 'def load_trained_model'"
-        HAS_ERROR=1
+        echo "⚠️  WARNING: strategy.py is missing 'def load_trained_model'. Triggering surgical fix..."
+        PROMPT_FIX="The file $EXP_DIR/strategy.py is missing the MANDATORY 'def load_trained_model(path, device)' function. \
+        Please ADD this function to the end of the file. It should load the model weights from the given path and return the model instance. \
+        Refer to the Task Background and original strategy for the model class name."
+        
+        printf "%b" "$PROMPT_FIX" | python3 "$AGENT_APP_ROOT/scripts/llm_runner.py" \
+            --model "$LLM_MODEL" \
+            --cwd "$EXP_DIR" \
+            --whitelist "strategy.py" \
+            --timeout "$LLM_TIMEOUT" \
+            $LOCK_FLAG \
+            $NO_EXEC_FLAG \
+            --resume
+            
+        # Re-check
+        if ! grep -q "def load_trained_model" "$EXP_DIR/strategy.py"; then
+            echo "❌ ERROR: Surgical fix failed to restore 'load_trained_model'."
+            HAS_ERROR=1
+        fi
     fi
 
-    # 8. Check Evaluator Anti-Cheating Protection
-    if ! grep -q "def check_data_leakage" "$EXP_DIR/evaluator.py"; then
-        echo "❌ ERROR: evaluator.py is missing 'def check_data_leakage'! Security protection was removed by AI."
-        HAS_ERROR=1
-    fi
-    if ! grep -q "check_data_leakage(" "$EXP_DIR/evaluator.py"; then
-        echo "❌ ERROR: evaluator.py defines but NEVER CALLS 'check_data_leakage'! Anti-cheating is inactive."
-        HAS_ERROR=1
+    # 8. Check Evaluator Engine (Task-Aware)
+    if [[ "$TASK_TYPE" == *"Reinforcement"* ]]; then
+        # RL Check: Verify the engine calls the metric interface
+        if ! grep -q "calculate_rl_score" "$EXP_DIR/evaluator.py"; then
+            echo "❌ ERROR: evaluator.py lost the RL metric interface!"
+            HAS_ERROR=1
+        fi
+    else
+        # Standard Check: Anti-Cheating Protection
+        if ! grep -q "def check_data_leakage" "$EXP_DIR/evaluator.py"; then
+            echo "❌ ERROR: evaluator.py is missing 'def check_data_leakage'!"
+            HAS_ERROR=1
+        fi
+        if ! grep -q "check_data_leakage(" "$EXP_DIR/evaluator.py"; then
+            echo "❌ ERROR: evaluator.py defines but NEVER CALLS 'check_data_leakage'!"
+            HAS_ERROR=1
+        fi
     fi
 
     # 9. Dry Run (Sequential)
@@ -493,7 +543,9 @@ if [ -f "$EXP_DIR/evaluator.py" ]; then
     current_dir=$(pwd)
     cd "$EXP_DIR" || exit
     # Capture output and trim whitespace
-    PLOT_OUTPUT=$("$VENV_PYTHON" "evaluator.py" --dry-run-plot 2>/dev/null | tr -d '[:space:]')
+    # We remove 2>/dev/null to see errors if this fails
+    PLOT_OUTPUT=$("$VENV_PYTHON" "evaluator.py" --dry-run-plot | tr -d '[:space:]')
+    echo "[Debug] Detected Plot Output: $PLOT_OUTPUT"
     cd "$current_dir" || exit
 fi
 
@@ -504,57 +556,65 @@ export EVAL_CMD
 export PLOT_OUTPUT
 export TASK_BG_TEXT
 export METRIC_TEXT
+export AGENT_APP_ROOT
 
 python3 - <<'EOF'
 import json
 import os
+from pathlib import Path
 
-config_path = 'config.json'
+# Use the environment variable to find the absolute app root
+app_root = os.environ.get('AGENT_APP_ROOT', os.getcwd())
+config_path = os.path.join(app_root, 'config.json')
+template_path = os.path.join(app_root, 'config_template.json')
+
 try:
     data = {}
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
             try: data = json.load(f)
             except: data = {}
-    elif os.path.exists('config_template.json'):
-        with open('config_template.json', 'r') as f:
+    elif os.path.exists(template_path):
+        with open(template_path, 'r') as f:
             try: data = json.load(f)
             except: data = {}
     
     if 'global_vars' not in data: data['global_vars'] = {}
 
-    # Update Fields
-    # Using os.environ to get exported bash variables
-    data['root_dir'] = f"./{os.environ['PROJECT_NAME']}"
+    # 1. Update root_dir with ABSOLUTE PATH to ensure the Agent can always find it
+    # We are currently in the Target Root (where PROJECT_NAME folder was created)
+    project_abs_path = os.path.abspath(os.path.join(os.getcwd(), os.environ['PROJECT_NAME']))
+    data['root_dir'] = project_abs_path
+    
+    # 2. Update Global Variables
     data['global_vars']['venv'] = os.environ['VENV_PYTHON']
     
-    # Construct sequential eval_cmd for Agent usage (Train then Eval)
+    # Use the custom EVAL_CMD from UI, or fall back to the sequential template
     py = os.environ['VENV_PYTHON']
-    data['global_vars']['eval_cmd'] = os.environ.get('EVAL_CMD', f"{py} strategy.py && {py} evaluator.py")
+    default_cmd = f"{py} strategy.py && {py} evaluator.py"
+    data['global_vars']['eval_cmd'] = os.environ.get('EVAL_CMD', default_cmd)
     
-    # Plot names with fallback
+    # 3. Handle Plot Names
     plot_out = os.environ.get('PLOT_OUTPUT', '')
     if not plot_out:
         plot_out = "@best_result.png"
     data['global_vars']['plot_names'] = plot_out
     
+    # 4. Construct System Prompt
     task = os.environ.get('TASK_BG_TEXT', '')
     metric = os.environ.get('METRIC_TEXT', '')
-    
-    # Enhanced System Prompt
     sys_instruction = (
-        "1. You can improve by modifying Model Architecture (scale up/down), Hyperparameter Search (optimize search space), "
-        "and Training Process (epochs, optimizer, schedule, etc).\n"
-        "2. Add debug info and SAVE worst samples/predictions as .npy files for later analysis of failure cases.\n"
+        "1. You can improve by modifying Model Architecture, Hyperparameter Search, and Reward/Feature logic.\n"
+        "2. Add debug info and SAVE worst samples/predictions as .npy files for analysis.\n"
         "3. Optimize for speed; avoid redundancy."
     )
-    
-    sys_prompt = f"You are an expert AI Data Scientist. Task: {task}. Metric: {metric}. Goal: Optimize strategy.py. \n{sys_instruction}"
-    data['global_vars']['DEFAULT_SYS'] = sys_prompt
+    data['global_vars']['DEFAULT_SYS'] = f"You are an expert AI Data Scientist. Task: {task}. Metric: {metric}. Goal: Optimize strategy.py. \n{sys_instruction}"
 
+    # Write back to the main config.json
     with open(config_path, 'w') as f:
         json.dump(data, f, indent=2)
-    print(f"✅ config.json updated successfully. Root: {data['root_dir']}")
+    print(f"✅ config.json updated successfully at: {config_path}")
+    print(f"📍 New Project Root: {data['root_dir']}")
 except Exception as e:
     print(f"❌ Failed to update config.json: {e}")
 EOF

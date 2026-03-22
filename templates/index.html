@@ -962,7 +962,14 @@
 
                 // --- SCRIPT RUNNER STATE ---
                 const scriptRunning = ref(false);
-                const scriptLogs = ref([]);
+                // Persistence: Safe load logs from localStorage
+                let initialLogs = [];
+                try {
+                    const savedLogs = localStorage.getItem('agent_commander_script_logs');
+                    if (savedLogs) initialLogs = JSON.parse(savedLogs);
+                } catch (e) { console.warn("Failed to parse saved logs", e); }
+                const scriptLogs = ref(initialLogs);
+                
                 const scriptsList = ref([]);
                 const selectedScriptIndex = ref(null);
                 const selectedScript = ref(null);
@@ -974,8 +981,16 @@
                         const res = await fetch('/api/scripts/list');
                         if (res.ok) {
                             scriptsList.value = await res.json();
-                            // If only one, select it
-                            if (scriptsList.value.length === 1) {
+                            
+                            // Persistence: Restore last selected script
+                            const lastScriptId = localStorage.getItem('agent_commander_last_script_id');
+                            if (lastScriptId !== null) {
+                                const idx = scriptsList.value.findIndex(s => s.name === lastScriptId);
+                                if (idx !== -1) {
+                                    selectedScriptIndex.value = idx;
+                                    onScriptSelect(true); // pass true to indicate we are restoring
+                                }
+                            } else if (scriptsList.value.length === 1) {
                                 selectedScriptIndex.value = 0;
                                 onScriptSelect();
                             }
@@ -985,23 +1000,48 @@
                     }
                 };
 
-                const onScriptSelect = () => {
+                const onScriptSelect = (isRestoring = false) => {
                     if (selectedScriptIndex.value === null) return;
                     
                     const s = scriptsList.value[selectedScriptIndex.value];
+                    selectedScript.value = s;
                     scriptForm.value = {};
                     
+                    // Save selection
+                    localStorage.setItem('agent_commander_last_script_id', s.name);
+                    
+                    // Load saved form values for this specific script
+                    const storageKey = `agent_commander_form_${s.name}`;
+                    const savedForm = localStorage.getItem(storageKey);
+                    const parsedSavedForm = savedForm ? JSON.parse(savedForm) : {};
+
                     // Pre-fill defaults & Inject Dynamic Options
                     if (s.inputs) {
                         s.inputs.forEach(f => {
-                            // Set default value
-                            scriptForm.value[f.id] = f.default;
+                            // Priority: Saved value > Default value
+                            if (parsedSavedForm[f.id] !== undefined) {
+                                scriptForm.value[f.id] = parsedSavedForm[f.id];
+                            } else {
+                                scriptForm.value[f.id] = f.default;
+                            }
                         });
                     }
-                    
-                    // Trigger Render AFTER state is ready
-                    selectedScript.value = s;
                 };
+
+                // Watch for form changes to persist
+                watch(scriptForm, (newVal) => {
+                    if (selectedScript.value) {
+                        const storageKey = `agent_commander_form_${selectedScript.value.name}`;
+                        localStorage.setItem(storageKey, JSON.stringify(newVal));
+                    }
+                }, { deep: true });
+
+                // Watch for log changes to persist
+                watch(scriptLogs, (newLogs) => {
+                    // Only store last 500 lines to prevent localStorage overflow
+                    const limitLogs = newLogs.slice(-500);
+                    localStorage.setItem('agent_commander_script_logs', JSON.stringify(limitLogs));
+                }, { deep: true });
 
                 const runScript = async () => {
                     if (!selectedScript.value) return;
