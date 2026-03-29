@@ -284,7 +284,7 @@
             },
             {
               "config": {
-                "command": "cd {current_exp_path} && ( {eval_cmd} ) > eval_out.txt 2>&1; cat eval_out.txt",
+                "command": "cd {current_exp_path} && ( ulimit -v 41943040; {eval_cmd} ) > eval_out.txt 2>&1; cat eval_out.txt",
                 "output_vars": [
                   "test_output"
                 ],
