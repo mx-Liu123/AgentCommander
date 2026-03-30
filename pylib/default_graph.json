@@ -629,7 +629,7 @@
     },
     {
       "config": {
-        "code": "result = context['cycle'] < context.get('n_cycles', 10)"
+        "code": "result = int(context['cycle']) < int(context.get('n_cycles', 10))"
       },
       "id": "check_cycles",
       "label": "Check Cycles",
