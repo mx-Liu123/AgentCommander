@@ -7,6 +7,7 @@ import queue
 import base64
 import subprocess
 import threading
+import psutil
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
@@ -888,16 +889,35 @@ def start_agent():
 
 @app.route('/api/stop', methods=['POST'])
 def stop_agent():
+    global agent_process
     stop_type = request.args.get('type', 'force')
-    
-    log_queue.put({"type": "log", "data": "💀 Force stop requested."})
-    if agent_process and agent_process.is_alive():
-        stop_event.set() 
-        agent_process.join(timeout=1.0)
-        if agent_process.is_alive(): agent_process.terminate()
-        socketio.emit('status', {'type': 'status', 'data': 'stopped'})
-    return jsonify({'status': 'stopped', 'mode': 'force'})
 
+    log_queue.put({"type": "log", "data": "💀 Stop requested (Recursive Cleanup)..."})
+
+    if agent_process and agent_process.is_alive():
+        try:
+            # Recursive cleanup using psutil
+            parent = psutil.Process(agent_process.pid)
+            children = parent.children(recursive=True)
+            for child in children:
+                try:
+                    child.kill()
+                except psutil.NoSuchProcess:
+                    pass
+
+            # Finally stop the agent process
+            stop_event.set()
+            agent_process.join(timeout=1.0)
+            if agent_process.is_alive(): 
+                agent_process.terminate()
+
+            socketio.emit('status', {'type': 'status', 'data': 'stopped'})
+        except psutil.NoSuchProcess:
+            pass
+        except Exception as e:
+            print(f"Error during recursive stop: {e}")
+
+    return jsonify({'status': 'stopped', 'mode': 'force'})
 @app.route('/api/delete_path', methods=['DELETE'])
 def delete_path_api():
     try:

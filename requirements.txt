@@ -8,4 +8,5 @@ scikit-learn
 matplotlib
 xgboost
 lightgbm
+psutil
 torch
